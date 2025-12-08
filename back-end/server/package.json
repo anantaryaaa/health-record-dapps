@@ -1,0 +1,22 @@
+{
+  "name": "health-record-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Decentralized Health Record DApps (Node.js, Express, ethers.js, IPFS, JWT, Swagger)",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ethers": "^6.8.1",
+    "ipfs-http-client": "^60.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "dotenv": "^16.3.1",
+    "swagger-ui-express": "^4.6.3",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

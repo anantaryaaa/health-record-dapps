@@ -1,0 +1,68 @@
+openapi: 3.0.0
+info:
+  title: Decentralized Health Record API
+  version: 1.0.0
+  description: API documentation for Health Record DApps backend
+servers:
+  - url: http://localhost:3000/api
+paths:
+  /identity/register:
+    post:
+      summary: Register DID
+      responses:
+        '200':
+          description: Success
+  /identity/login:
+    post:
+      summary: Login with DID
+      responses:
+        '200':
+          description: Success
+  /access/grant:
+    post:
+      summary: Grant access
+      responses:
+        '200':
+          description: Success
+  /access/revoke:
+    post:
+      summary: Revoke access
+      responses:
+        '200':
+          description: Success
+  /data/upload:
+    post:
+      summary: Upload encrypted data
+      responses:
+        '200':
+          description: Success
+  /data/download/{hash}:
+    get:
+      summary: Download encrypted data
+      parameters:
+        - in: path
+          name: hash
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+  /research/request:
+    post:
+      summary: Request research/statistics
+      responses:
+        '200':
+          description: Success
+  /research/result/{id}:
+    get:
+      summary: Get research result
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success

@@ -1,0 +1,33 @@
+
+# === General Node/Foundry/Project Ignore ===
+node_modules/
+cache/
+out/
+docs/
+.env
+.env.*
+*.log
+*.tmp
+.idea/
+.vscode/
+
+# Ignore broadcast logs except root /broadcast
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+
+# Ignore OS/Editor files
+.DS_Store
+Thumbs.db
+*.swp
+
+# Ignore smart contract build artifacts
+back-end/smart-contract/cache/
+back-end/smart-contract/out/
+
+# Ignore test coverage
+coverage/
+
+# Ignore local .git in subfolders
+back-end/smart-contract/.git/
+
