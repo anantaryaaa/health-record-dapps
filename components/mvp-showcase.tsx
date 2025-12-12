@@ -35,7 +35,7 @@ export function MVPShowcase() {
       image: "/mvp-patient-dashboard.png",
       highlights: [
         "QR Code for instant identity verification",
-        "Encrypted data — only you hold the keys",
+        "Only you hold the keys",
         "Real-time medical activity tracking",
       ],
       gradient: "from-blue-500/20 to-primary/20",
