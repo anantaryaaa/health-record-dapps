@@ -76,7 +76,7 @@ export function LandingHero() {
             variants={itemVariants}
             className="text-4xl md:text-5xl lg:text-6xl font-bold font-sans mb-6 tracking-tight leading-[1.1] text-foreground"
           >
-            Secure Healthcare
+            Secure Health Data
             <br />
             <span className="bg-gradient-to-r from-primary via-blue-500 to-primary bg-clip-text text-transparent">
               On The Chain
