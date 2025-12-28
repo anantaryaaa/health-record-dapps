@@ -668,7 +668,7 @@ patientContract.on('MedicalRecordAdded', (patient, recordId, hospital, recordTyp
 
 ---
 
-## 🛡️ Security Considerations
+## Security Considerations
 
 1. **Soulbound Token (SBT)**: Patient tokens cannot be transferred
 2. **Access Expiration**: All access permissions have expiry timestamps
@@ -679,7 +679,7 @@ patientContract.on('MedicalRecordAdded', (patient, recordId, hospital, recordTyp
 
 ---
 
-## 📞 Support & Links
+## Support & Links
 
 - **Block Explorer:** https://sepolia-blockscout.lisk.com
 - **Lisk Sepolia Faucet:** https://faucet.sepolia-api.lisk.com
@@ -687,7 +687,7 @@ patientContract.on('MedicalRecordAdded', (patient, recordId, hospital, recordTyp
 
 ---
 
-## 🔧 Useful Cast Commands Reference
+## Useful Cast Commands Reference
 
 ```bash
 # Set environment variables
