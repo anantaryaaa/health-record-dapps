@@ -1,13 +1,16 @@
-import { LandingHero } from "@/components/landing-hero"
+"use client"
+
+import { useState } from "react"
+import { LandingSection } from "@/components/landing-section"
 import { Navbar } from "@/components/navbar"
-import { MVPShowcase } from "@/components/mvp-showcase"
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<"patient" | "hospital">("patient")
+
   return (
     <div className="relative min-h-screen ">
-      <Navbar />
-      <LandingHero />
-      <MVPShowcase />
+      <Navbar activeTab={activeTab} />
+      <LandingSection activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   )
 }

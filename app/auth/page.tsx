@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ConnectButton, useActiveAccount } from "thirdweb/react";
+import { ConnectButton, useActiveAccount, lightTheme } from "thirdweb/react";
 import { client, wallets } from "@/lib/thirdWeb";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Building2, User, ArrowLeft, ChevronRight } from "lucide-react";
+import { Building2, User, ArrowLeft, ChevronRight, Sparkles } from "lucide-react";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import { cn } from "@/lib/utils";
 
@@ -19,32 +19,40 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (account && selectedRole) {
-    router.push(`/dashboard/${selectedRole}`);
-  }
+      router.push(`/dashboard/${selectedRole}`);
+    }
+  }, [account, selectedRole, router]);
 
-  }, [account, selectedRole, router])  
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Subtle Dot Pattern */}
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 relative overflow-hidden">
+      {/* Background Orbs - static, no animation */}
+      <div className="absolute top-20 -left-32 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 -right-32 w-96 h-96 bg-secondary/40 rounded-full blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-primary/5 to-secondary/20 rounded-full blur-3xl" />
+      
+      {/* Simple Decorative Shapes - no animation */}
+      <div className="absolute top-1/4 left-[15%] w-16 h-16 border border-primary/15 rounded-2xl" />
+      <div className="absolute top-1/3 right-[12%] w-12 h-12 border border-secondary/30 rounded-full" />
+      <div className="absolute bottom-1/4 left-[20%] w-10 h-10 bg-primary/5 rounded-xl" />
+      <div className="absolute bottom-1/3 right-[18%] w-20 h-20 border border-primary/10 rounded-3xl" />
+
+      {/* Dot Pattern */}
       <DotPattern
         className={cn(
-          "[mask-image:radial-gradient(600px_circle_at_center,white,transparent)]",
-          "opacity-40"
+          "[mask-image:radial-gradient(700px_circle_at_center,white,transparent)]",
+          "opacity-30"
         )}
       />
-
-      {/* Minimal gradient accent */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-b from-primary/5 to-transparent rounded-full blur-3xl" />
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
         {/* Back to Home */}
-        <Link 
-          href="/" 
-          className="absolute top-8 left-8 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
+        <Link
+          href="/"
+          className="absolute top-8 left-8 flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-sm"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back</span>
+          <span>Back to Home</span>
         </Link>
 
         <AnimatePresence mode="wait">
@@ -57,6 +65,9 @@ export default function AuthPage() {
             />
           )}
         </AnimatePresence>
+
+        {/* Decorative Bottom Line */}
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-32 h-0.5 bg-gradient-to-r from-transparent via-primary/20 to-transparent rounded-full" />
       </div>
     </div>
   );
@@ -69,58 +80,67 @@ function RoleSelection({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.3 }}
-      className="w-full max-w-sm"
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.2 }}
+      className="w-full max-w-md"
     >
-      {/* Header */}
-      <div className="text-center mb-10">
-        <h1 className="text-2xl font-bold text-foreground mb-2">
-          Welcome to MediChain
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Select how you want to continue
+      {/* Glassmorphism Card */}
+      <div className="backdrop-blur-xl bg-card/80 border border-border/50 rounded-3xl p-8 shadow-xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold mb-3 bg-gradient-to-r from-primary to-[#0077C0] text-transparent bg-clip-text">
+            Welcome to MediChain
+          </h1>
+          <p className="text-muted-foreground">
+            Choose your role to continue
+          </p>
+        </div>
+
+        {/* Role Options */}
+        <div className="space-y-4">
+          <button
+            onClick={() => onSelectRole("patient")}
+            className="w-full flex items-center gap-4 p-5 bg-gradient-to-r from-secondary/50 to-secondary/30 border border-border/50 rounded-2xl hover:border-primary/50 hover:shadow-md transition-all duration-200 text-left group"
+          >
+            <div className="w-14 h-14 bg-gradient-to-br from-primary to-[#0077C0] rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+              <User className="w-7 h-7 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-primary text-lg">I&apos;m a Patient</p>
+              <p className="text-sm text-muted-foreground">Access & manage your medical records securely</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+          </button>
+
+          <button
+            onClick={() => onSelectRole("hospital")}
+            className="w-full flex items-center gap-4 p-5 bg-gradient-to-r from-secondary/50 to-secondary/30 border border-border/50 rounded-2xl hover:border-emerald-500/50 hover:shadow-md transition-all duration-200 text-left group"
+          >
+            <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <Building2 className="w-7 h-7 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-lg text-emerald-500">I&apos;m a Hospital</p>
+              <p className="text-sm text-foreground">Manage and access patient data with consent</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
+          </button>
+        </div>
+
+        {/* Decorative Separator */}
+        <div className="flex items-center gap-4 my-6">
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+          <div className="w-1.5 h-1.5 rounded-full bg-primary/30" />
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+        </div>
+
+        {/* Info */}
+        <p className="text-center text-muted-foreground text-xs">
+          Your data is protected by blockchain technology
         </p>
       </div>
-
-      {/* Role Options */}
-      <div className="space-y-3">
-        <motion.button
-          onClick={() => onSelectRole("patient")}
-          whileHover={{ x: 4 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full flex items-center gap-4 p-4 bg-card border border-border rounded-xl hover:border-primary/50 hover:bg-accent/50 transition-all duration-200 text-left group"
-        >
-          <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-            <User className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1">
-            <p className="font-medium text-foreground">Patient</p>
-            <p className="text-xs text-muted-foreground">Access your medical records</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-        </motion.button>
-
-        <motion.button
-          onClick={() => onSelectRole("hospital")}
-          whileHover={{ x: 4 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full flex items-center gap-4 p-4 bg-card border border-border rounded-xl hover:border-primary/50 hover:bg-accent/50 transition-all duration-200 text-left group"
-        >
-          <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1">
-            <p className="font-medium text-foreground">Hospital</p>
-            <p className="text-xs text-muted-foreground">Manage patient records</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-        </motion.button>
-      </div>
-
-      
     </motion.div>
   );
 }
@@ -137,76 +157,100 @@ function WalletConnection({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.3 }}
-      className="w-full max-w-sm"
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.2 }}
+      className="w-full max-w-md"
     >
-      {/* Card */}
-      <div className="p-6 bg-card border border-border rounded-2xl">
-        {/* Back */}
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-sm mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back</span>
-        </button>
-
-        {/* Icon & Header */}
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <Icon className="w-6 h-6 text-primary" />
+      {/* Glassmorphism Card */}
+      <div className="backdrop-blur-xl bg-card/80 border border-border/50 rounded-3xl p-8 shadow-xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div
+            className={cn(
+              "w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg",
+              isPatient
+                ? "bg-gradient-to-br from-primary to-[#0077C0] shadow-primary/25"
+                : "bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-emerald-500/25"
+            )}
+          >
+            <Icon className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground">
-            Continue as {isPatient ? "Patient" : "Hospital"}
-          </h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            Connect your wallet to sign in
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+            {isPatient ? "Patient Access" : "Hospital Access"}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Connect your wallet to continue
           </p>
         </div>
 
-        {/* Thirdweb Connect Button */}
-        <ConnectButton
-          client={client}
-          wallets={wallets}
-          connectModal={{
-            size: "compact",
-            title: "Connect to MediChain",
-            showThirdwebBranding: false,
-          }}
-          connectButton={{
-            label: "Connect Wallet",
-            style: {
-              width: "100%",
-              padding: "12px 20px",
-              borderRadius: "10px",
-              fontSize: "14px",
-              fontWeight: "500",
-              background: "hsl(220 80% 45%)",
-              border: "none",
-              color: "white",
-            },
-          }}
-          detailsButton={{
-            render: () => <></>
-          }}
-        />
+        {/* Wallet Providers - Thirdweb ConnectButton */}
+        <div className="flex justify-center mb-6">
+          <ConnectButton
+            client={client}
+            wallets={wallets}
+            theme={lightTheme({
+              colors: {
+                primaryButtonBg: isPatient ? "#0077C0" : "#10b981",
+                primaryButtonText: "#ffffff",
+              },
+            })}
+            connectButton={{
+              label: "Connect Wallet",
+              style: {
+                width: "100%",
+                padding: "16px 24px",
+                borderRadius: "12px",
+                fontSize: "16px",
+                fontWeight: "600",
+              },
+            }}
+            connectModal={{
+              size: "wide",
+              title: `Connect to MediChain`,
+              showThirdwebBranding: false,
+            }}
+            showAllWallets={false}
+          />
+        </div>
 
-        {/* Help Link */}
-        <p className="text-center text-muted-foreground text-xs mt-4">
-          New to crypto?{" "}
-          <a
-            href="https://metamask.io/download/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-          >
-            Get a wallet
-          </a>
-        </p>
+        {/* Features */}
+        <div className="space-y-3 mb-6">
+          <Feature
+            icon={<Sparkles className="w-4 h-4" />}
+            text={
+              isPatient
+                ? "Secure access to your health records"
+                : "Manage patient data with consent"
+            }
+          />
+          <Feature
+            icon={<Sparkles className="w-4 h-4" />}
+            text="Powered by blockchain technology"
+          />
+        </div>
+
+        {/* Back button */}
+        <button
+          onClick={onBack}
+          className="w-full flex items-center justify-center gap-2 py-3 text-muted-foreground hover:text-primary transition-colors text-sm"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Choose different role
+        </button>
       </div>
     </motion.div>
+  );
+}
+
+function Feature({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
+        {icon}
+      </div>
+      <span>{text}</span>
+    </div>
   );
 }

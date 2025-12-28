@@ -4,22 +4,26 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { useActiveAccount, ConnectButton } from "thirdweb/react"
+import { useActiveAccount, useDisconnect, ConnectButton, lightTheme } from "thirdweb/react"
 import { client, wallets } from "@/lib/thirdWeb"
 import { useRouter } from "next/navigation"
 import { PatientRegistrationForm } from "@/components/patient-registration-form"
-import { getPatientData, PatientData } from "@/lib/patientStorage"
+import { PatientQRCode } from "@/components/patient-qr-code"
+import { getPatientData, PatientData, clearAllAppData } from "@/lib/patientStorage"
 import { 
   User, 
   ShieldCheck, 
   Fingerprint, 
   Key, 
   ChevronRight, 
-  CreditCard,
   Info,
   FileText,
-  Calendar,
-  Loader2
+  Loader2,
+  QrCode,
+  LogOut,
+  AlertTriangle,
+  Eye,
+  EyeOff
 } from "lucide-react"
 
 export default function PatientDashboard() {
@@ -27,8 +31,24 @@ export default function PatientDashboard() {
   const [biometricEnabled, setBiometricEnabled] = useState(true)
   const [patientData, setPatientData] = useState<PatientData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showAddress, setShowAddress] = useState(false)
+  const [showQR, setShowQR] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const account = useActiveAccount()
+  const { disconnect } = useDisconnect()
   const router = useRouter()
+
+  const handleLogout = async () => {
+    // Clear all app data including patient data and wallet history
+    clearAllAppData()
+    
+    // Properly disconnect the wallet
+    if (account) {
+      disconnect(account as never)
+    }
+    
+    router.push("/auth")
+  }
 
   useEffect(() => {
     if (!account) {
@@ -109,32 +129,32 @@ export default function PatientDashboard() {
             </button>
           </div>
 
-          {/* User info */}
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-foreground">{patientData.name}</p>
-              <span className="text-xs text-emerald-500 flex items-center justify-end gap-1">
-                <ShieldCheck className="w-3 h-3" />
-                Verified
-              </span>
-            </div>
-            <ConnectButton
-              client={client}
-              wallets={wallets}
-              connectButton={{
-                style: {
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                },
-              }}
-            />
-          </div>
+          {/* Thirdweb Connect Button */}
+          <ConnectButton
+            client={client}
+            wallets={wallets}
+            theme={lightTheme({
+              colors: {
+                primaryButtonBg: "#0077C0",
+                primaryButtonText: "#ffffff",
+              },
+            })}
+            detailsButton={{
+              style: {
+                padding: "8px 16px",
+                borderRadius: "12px",
+              },
+            }}
+            onDisconnect={() => {
+              clearAllAppData()
+              router.push("/auth")
+            }}
+          />
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto p-6">
+      <main className="max-w-5xl mx-auto p-6 space-y-6">
         {activeTab === "profile" ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Profile Card */}
@@ -161,15 +181,18 @@ export default function PatientDashboard() {
                       <p className="text-lg font-bold text-foreground">{patientData.gender}</p>
                     </div>
                     <div className="text-center p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Usia</p>
-                      <p className="text-lg font-bold text-foreground">{patientData.age}</p>
+                      <p className="text-xs text-center text-muted-foreground uppercase tracking-wide">Usia</p>
+                      <p className="text-lg font-bold text-foreground">{patientData.age} tahun</p>
                     </div>
                   </div>
 
-                  {/* View Card Button */}
-                  <Button className="w-full gap-2">
-                    <CreditCard className="w-4 h-4" />
-                    Lihat Kartu Pasien
+                  {/* QR Code Button */}
+                  <Button 
+                    className="w-full gap-2 bg-gradient-to-r from-primary to-[#0077C0] hover:opacity-90"
+                    onClick={() => setShowQR(true)}
+                  >
+                    <QrCode className="w-4 h-4" />
+                    Tampilkan QR Code
                   </Button>
                 </div>
               </CardContent>
@@ -228,30 +251,119 @@ export default function PatientDashboard() {
           </div>
         ) : (
           /* Riwayat Medis Tab */
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-6">
-                <FileText className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-semibold text-foreground">Riwayat Medis</h3>
-              </div>
-              
-              <div className="text-center py-12">
-                <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Belum ada riwayat medis</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Riwayat medis Anda akan muncul di sini setelah kunjungan ke rumah sakit
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <FileText className="w-5 h-5 text-primary" />
+                  <h3 className="text-lg font-semibold text-foreground">Riwayat Medis</h3>
+                </div>
+                
+                {/* Medical Records List */}
+                <div className="space-y-4">
+                  {/* Record 1 */}
+                  <div className="p-4 bg-muted/30 border border-border rounded-xl">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <span className="text-xs text-muted-foreground">15 Desember 2024</span>
+                        <h4 className="font-semibold text-foreground mt-1">Influenza A</h4>
+                      </div>
+                      <span className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-medium">
+                        Selesai
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Keluhan / Gejala</p>
+                        <p className="text-sm text-foreground">Demam tinggi, batuk kering, nyeri otot, sakit kepala, lemas</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Tindakan / Resep</p>
+                        <p className="text-sm text-foreground">Paracetamol 500mg 3x1, Oseltamivir 75mg 2x1, Istirahat total 5 hari</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <ShieldCheck className="w-3 h-3 text-primary" />
+                      RS Siloam Jakarta Selatan
+                    </div>
+                  </div>
+
+                  {/* Record 2 */}
+                  <div className="p-4 bg-muted/30 border border-border rounded-xl">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <span className="text-xs text-muted-foreground">28 November 2024</span>
+                        <h4 className="font-semibold text-foreground mt-1">Gastritis Akut</h4>
+                      </div>
+                      <span className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-medium">
+                        Selesai
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Keluhan / Gejala</p>
+                        <p className="text-sm text-foreground">Nyeri ulu hati, mual, kembung, tidak nafsu makan</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Tindakan / Resep</p>
+                        <p className="text-sm text-foreground">Omeprazole 20mg 1x1, Antasida 3x1, Hindari makanan pedas & asam</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <ShieldCheck className="w-3 h-3 text-primary" />
+                      RS Pondok Indah Bintaro
+                    </div>
+                  </div>
+
+                  {/* Record 3 */}
+                  <div className="p-4 bg-muted/30 border border-border rounded-xl">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <span className="text-xs text-muted-foreground">5 Oktober 2024</span>
+                        <h4 className="font-semibold text-foreground mt-1">Tension Headache</h4>
+                      </div>
+                      <span className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-medium">
+                        Selesai
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Keluhan / Gejala</p>
+                        <p className="text-sm text-foreground">Sakit kepala tegang, leher kaku, mata lelah, sulit konsentrasi</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Tindakan / Resep</p>
+                        <p className="text-sm text-foreground">Ibuprofen 400mg bila perlu, Myonal 50mg 2x1, Fisioterapi leher</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <ShieldCheck className="w-3 h-3 text-primary" />
+                      Klinik Medika Surabaya
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
-        {/* Wallet Address */}
-        <div className="mt-6 p-4 bg-card border border-border rounded-xl">
-          <p className="text-sm text-muted-foreground mb-1">Wallet Address</p>
-          <p className="text-sm font-mono text-foreground break-all">{account.address}</p>
-        </div>
+        
       </main>
+
+      {/* QR Code Modal */}
+      {patientData && (
+        <PatientQRCode
+          patientData={patientData}
+          isOpen={showQR}
+          onClose={() => setShowQR(false)}
+        />
+      )}
     </div>
   )
 }

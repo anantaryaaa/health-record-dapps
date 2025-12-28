@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { User, CreditCard, Droplets, Users, Calendar, ArrowRight, Loader2 } from "lucide-react"
+import { Loader2, User, CreditCard, Droplets, Users, Calendar } from "lucide-react"
 import { savePatientData, PatientData } from "@/lib/patientStorage"
 
 interface PatientRegistrationFormProps {
@@ -34,7 +34,6 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
     e.preventDefault()
     setIsSubmitting(true)
 
-    // Simulate API call / blockchain transaction
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
     const patientData: PatientData = {
@@ -63,143 +62,151 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.3 }}
       className="w-full max-w-md mx-auto"
     >
-      <div className="p-6 bg-card border border-border rounded-2xl">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <User className="w-7 h-7 text-primary" />
-          </div>
-          <h2 className="text-xl font-bold text-foreground">Lengkapi Data Diri</h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            Isi data berikut untuk melanjutkan
-          </p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Nama Lengkap */}
-          <div className="space-y-2">
-            <Label htmlFor="name" className="flex items-center gap-2">
-              <User className="w-4 h-4 text-muted-foreground" />
-              Nama Lengkap
-            </Label>
-            <Input
-              id="name"
-              placeholder="Masukkan nama lengkap"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
+      {/* Card with gradient border effect */}
+      <div className="relative">
+        {/* Gradient glow behind */}
+        <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 via-secondary/30 to-primary/20 rounded-3xl blur-lg opacity-60" />
+        
+        {/* Main card */}
+        <div className="relative p-8 bg-card/95 backdrop-blur-sm border border-border/50 rounded-2xl shadow-xl">
+          {/* Header with icon */}
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary to-[#0077C0] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/25">
+              <User className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Registrasi Pasien</h2>
+            <p className="text-muted-foreground text-sm">
+              Lengkapi data diri untuk melanjutkan
+            </p>
           </div>
 
-          {/* NIK / Nomor KTP */}
-          <div className="space-y-2">
-            <Label htmlFor="nik" className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-muted-foreground" />
-              Nomor KTP (NIK)
-            </Label>
-            <Input
-              id="nik"
-              placeholder="Masukkan 16 digit NIK"
-              value={formData.nik}
-              onChange={(e) => setFormData({ ...formData, nik: e.target.value })}
-              minLength={16}
-              maxLength={16}
-              required
-            />
-          </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Name field */}
+            <div className="space-y-2">
+              <Label htmlFor="name" className="flex items-center gap-2 text-sm font-medium">
+                <User className="w-4 h-4 text-primary" />
+                Nama Lengkap
+              </Label>
+              <Input
+                id="name"
+                placeholder="Masukkan nama lengkap"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="h-11 bg-muted/30 border-border/50 focus:border-primary/50 focus:ring-primary/20"
+                required
+              />
+            </div>
 
-          {/* Golongan Darah */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Droplets className="w-4 h-4 text-muted-foreground" />
-              Golongan Darah
-            </Label>
-            <Select
-              value={formData.bloodType}
-              onValueChange={(value) => setFormData({ ...formData, bloodType: value })}
+            {/* NIK field */}
+            <div className="space-y-2">
+              <Label htmlFor="nik" className="flex items-center gap-2 text-sm font-medium">
+                <CreditCard className="w-4 h-4 text-primary" />
+                Nomor KTP (NIK)
+              </Label>
+              <Input
+                id="nik"
+                placeholder="Masukkan 16 digit NIK"
+                value={formData.nik}
+                onChange={(e) => setFormData({ ...formData, nik: e.target.value })}
+                className="h-11 bg-muted/30 border-border/50 focus:border-primary/50 focus:ring-primary/20 font-mono"
+                minLength={16}
+                maxLength={16}
+                required
+              />
+            </div>
+
+            {/* Two columns for Blood Type and Gender */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <Droplets className="w-4 h-4 text-primary" />
+                  Gol. Darah
+                </Label>
+                <Select
+                  value={formData.bloodType}
+                  onValueChange={(value) => setFormData({ ...formData, bloodType: value })}
+                >
+                  <SelectTrigger className="h-11 bg-muted/30 border-border/50">
+                    <SelectValue placeholder="Pilih" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <Users className="w-4 h-4 text-primary" />
+                  Gender
+                </Label>
+                <Select
+                  value={formData.gender}
+                  onValueChange={(value) => setFormData({ ...formData, gender: value })}
+                >
+                  <SelectTrigger className="h-11 bg-muted/30 border-border/50">
+                    <SelectValue placeholder="Pilih" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pria">Pria</SelectItem>
+                    <SelectItem value="Wanita">Wanita</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Age field */}
+            <div className="space-y-2">
+              <Label htmlFor="age" className="flex items-center gap-2 text-sm font-medium">
+                <Calendar className="w-4 h-4 text-primary" />
+                Usia
+              </Label>
+              <Input
+                id="age"
+                type="number"
+                placeholder="Masukkan usia"
+                value={formData.age}
+                onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                className="h-11 bg-muted/30 border-border/50 focus:border-primary/50 focus:ring-primary/20"
+                min={1}
+                max={120}
+                required
+              />
+            </div>
+
+            {/* Separator */}
+            <div className="flex items-center gap-3 py-2">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary/30" />
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+            </div>
+
+            {/* Submit button */}
+            <Button
+              type="submit"
+              className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-[#0077C0] hover:opacity-90 shadow-lg shadow-primary/25"
+              disabled={!isFormValid || isSubmitting}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih golongan darah" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="A+">A+</SelectItem>
-                <SelectItem value="A-">A-</SelectItem>
-                <SelectItem value="B+">B+</SelectItem>
-                <SelectItem value="B-">B-</SelectItem>
-                <SelectItem value="AB+">AB+</SelectItem>
-                <SelectItem value="AB-">AB-</SelectItem>
-                <SelectItem value="O+">O+</SelectItem>
-                <SelectItem value="O-">O-</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  Menyimpan...
+                </>
+              ) : (
+                "Lanjutkan"
+              )}
+            </Button>
+          </form>
 
-          {/* Gender */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              Jenis Kelamin
-            </Label>
-            <Select
-              value={formData.gender}
-              onValueChange={(value) => setFormData({ ...formData, gender: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih jenis kelamin" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Pria">Pria</SelectItem>
-                <SelectItem value="Wanita">Wanita</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Usia */}
-          <div className="space-y-2">
-            <Label htmlFor="age" className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              Usia
-            </Label>
-            <Input
-              id="age"
-              type="number"
-              placeholder="Masukkan usia"
-              value={formData.age}
-              onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-              min={1}
-              max={120}
-              required
-            />
-          </div>
-
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            className="w-full gap-2 mt-6"
-            disabled={!isFormValid || isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Menyimpan...
-              </>
-            ) : (
-              <>
-                Lanjutkan
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </Button>
-        </form>
-
-        {/* Wallet Info */}
-        <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-          <p className="text-xs text-muted-foreground text-center">
-            Terhubung: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+          {/* Footer info */}
+          <p className="text-center text-muted-foreground text-xs mt-6">
+            Data Anda akan tersimpan dengan aman di blockchain
           </p>
         </div>
       </div>

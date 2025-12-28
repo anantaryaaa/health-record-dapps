@@ -34,3 +34,44 @@ export function savePatientData(data: PatientData): void {
 export function isPatientRegistered(walletAddress: string): boolean {
     return getPatientData(walletAddress) !== null;
 }
+
+export function clearPatientData(walletAddress: string): void {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(`${STORAGE_KEY}_${walletAddress}`);
+    localStorage.removeItem(STORAGE_KEY);
+}
+
+export function clearAllPatientData(): void {
+    if (typeof window === "undefined") return;
+    // Clear all patient related data
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+        if (key.startsWith(STORAGE_KEY)) {
+            localStorage.removeItem(key);
+        }
+    });
+}
+
+export function clearAllAppData(): void {
+    if (typeof window === "undefined") return;
+    
+    // Clear patient data
+    clearAllPatientData();
+    
+    // Clear Thirdweb connection history
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+        if (
+            key.startsWith("thirdweb") || 
+            key.startsWith("walletconnect") ||
+            key.startsWith("wc@") ||
+            key.includes("wallet") ||
+            key.includes("connector")
+        ) {
+            localStorage.removeItem(key);
+        }
+    });
+    
+    // Clear biometric credentials
+    localStorage.removeItem("medichain_biometric_credentials");
+}

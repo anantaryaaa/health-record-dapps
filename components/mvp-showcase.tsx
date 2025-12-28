@@ -38,7 +38,7 @@ export function MVPShowcase() {
         "Only you hold the keys",
         "Real-time medical activity tracking",
       ],
-      gradient: "from-blue-500/20 to-primary/20",
+      gradient: "from-[#0077C0]/20 to-primary/20",
       badge: "For Patients",
       icon: User
     },
@@ -51,7 +51,7 @@ export function MVPShowcase() {
         "Automatic identity verification",
         "Access medical data with patient consent",
       ],
-      gradient: "from-primary/20 to-blue-400/20",
+      gradient: "from-primary/20 to-secondary/40",
       badge: "For Hospitals",
       icon: Building2
     }
@@ -76,7 +76,7 @@ export function MVPShowcase() {
         <motion.div variants={itemVariants} className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
             One Platform, Two{" "}
-            <span className="bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-primary to-[#0077C0] bg-clip-text text-transparent">
               Integrated Solutions
             </span>
           </h2>
