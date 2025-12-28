@@ -29,4 +29,3 @@ coverage/
 
 # Ignore local .git in subfolders
 back-end/smart-contract/.git/
-
