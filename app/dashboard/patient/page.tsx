@@ -4,9 +4,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { useActiveAccount, useDisconnect, ConnectButton, lightTheme, useConnect } from "thirdweb/react"
-import { inAppWallet } from "thirdweb/wallets"
-import { client, wallets, liskSepolia } from "@/lib/thirdWeb"
+import { useActiveAccount, useDisconnect, ConnectButton, lightTheme } from "thirdweb/react"
+import { client, wallets } from "@/lib/thirdWeb"
 import { useRouter } from "next/navigation"
 import { PatientRegistrationForm } from "@/components/patient-registration-form"
 import { PatientQRCode } from "@/components/patient-qr-code"
@@ -25,7 +24,7 @@ import {
 
 export default function PatientDashboard() {
   const [activeTab, setActiveTab] = useState<"profile" | "history">("profile")
-  const [biometricEnabled, setBiometricEnabled] = useState(true)
+  const [biometricEnabled, setBiometricEnabled] = useState(false)
   const [patientData, setPatientData] = useState<PatientData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showAddress, setShowAddress] = useState(false)
@@ -33,7 +32,6 @@ export default function PatientDashboard() {
   const [showProfile, setShowProfile] = useState(false)
   const account = useActiveAccount()
   const { disconnect } = useDisconnect()
-  const { connect } = useConnect()
   const router = useRouter()
 
   const handleLogout = async () => {

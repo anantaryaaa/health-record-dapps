@@ -96,12 +96,14 @@ export function isPatientRegistered(walletAddress?: string): boolean {
 export function clearPatientData(walletAddress: string): void {
     if (typeof window === "undefined") return;
     localStorage.removeItem(`${STORAGE_KEY}_${walletAddress}`);
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(CURRENT_PATIENT_KEY); // Also clear global key
 }
 
 export function clearAllPatientData(): void {
     if (typeof window === "undefined") return;
-    // Clear all patient related data
+    // Clear global patient key
+    localStorage.removeItem(CURRENT_PATIENT_KEY);
+    // Clear all address-specific patient data
     const keys = Object.keys(localStorage);
     keys.forEach(key => {
         if (key.startsWith(STORAGE_KEY)) {
@@ -139,10 +141,10 @@ export function clearAllAppData(): void {
 const BIOMETRIC_KEY = "medichain_biometric_enabled";
 
 export function getBiometricEnabled(): boolean {
-    if (typeof window === "undefined") return true;
+    if (typeof window === "undefined") return false;
     const value = localStorage.getItem(BIOMETRIC_KEY);
-    // Default to true if not set
-    if (value === null) return true;
+    // Default to FALSE if not set (user requested biometric OFF by default)
+    if (value === null) return false;
     return value === "true";
 }
 
