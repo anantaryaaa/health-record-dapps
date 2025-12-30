@@ -32,10 +32,10 @@ export function LandingHeroPatient() {
           variants={itemVariants}
           className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-tight leading-[1.1] text-foreground"
         >
-          Kendali Penuh
+          Full Control
           <br />
           <span className="bg-gradient-to-r from-primary to-[#0077C0] bg-clip-text text-transparent">
-            Atas Data Kesehatan Anda
+            Over Your Health Data
           </span>
         </motion.h1>
 
@@ -43,8 +43,8 @@ export function LandingHeroPatient() {
           variants={itemVariants}
           className="text-lg md:text-xl text-muted-foreground mb-10 max-w-xl leading-relaxed"
         >
-          Simpan rekam medis Anda di blockchain. Akses kapan saja, di mana saja, 
-          dan <span className="text-foreground font-medium">Anda yang menentukan</span> siapa yang boleh melihatnya.
+          Store your medical records on the blockchain. Access anytime, anywhere, 
+          and <span className="text-foreground font-medium">you decide</span> who can view them.
         </motion.p>
 
         
@@ -53,7 +53,7 @@ export function LandingHeroPatient() {
         <motion.div variants={itemVariants}>
           <Link href="/auth">
             <Button size="lg" className="h-14 px-8 gap-3 bg-gradient-to-r from-primary to-[#0077C0] hover:from-[#0066a8] hover:to-[#005a94] text-lg font-semibold rounded-xl">
-              Mulai Sekarang
+              Get Started
               <ChevronRight className="w-5 h-5" />
             </Button>
           </Link>
@@ -70,8 +70,42 @@ export function LandingHeroPatient() {
         <div className="relative">
           {/* Subtle glow behind image */}
           <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-blue-400/20 rounded-3xl blur-2xl opacity-50" />
+          
+          {/* Floating Icons */}
+          <motion.div 
+            className="absolute -top-4 -left-4 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center z-20"
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Shield className="w-6 h-6 text-primary" />
+          </motion.div>
+          
+          <motion.div 
+            className="absolute top-1/4 -right-6 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center z-20"
+            animate={{ y: [0, -10, 0] }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+          >
+            <QrCode className="w-6 h-6 text-primary" />
+          </motion.div>
+          
+          <motion.div 
+            className="absolute bottom-1/4 -left-6 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center z-20"
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          >
+            <FileText className="w-6 h-6 text-primary" />
+          </motion.div>
+          
+          <motion.div 
+            className="absolute -bottom-4 right-8 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center z-20"
+            animate={{ y: [0, -6, 0] }}
+            transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+          >
+            <Fingerprint className="w-6 h-6 text-primary" />
+          </motion.div>
+
           <Image
-            src="/landing-page-photo.png"
+            src="/landing-hero-patient.jpg"
             alt="Patient Healthcare"
             width={900}
             height={900}

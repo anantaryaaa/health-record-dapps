@@ -40,14 +40,14 @@ export function LandingSection({ activeTab, setActiveTab }: LandingHeroProps) {
         {/* Tabs */}
         <div className="max-w-7xl mx-auto w-full z-10 relative mb-12">
           <div className="flex justify-center">
-            <div className="flex gap-12">
+            <div className="relative flex gap-12">
               <button
                 onClick={() => setActiveTab("patient")}
                 className={cn(
-                  "text-lg font-semibold transition-all duration-300 pb-2 border-b-2",
+                  "text-lg font-semibold transition-all duration-300 pb-3 cursor-pointer",
                   activeTab === "patient"
-                    ? "text-primary border-primary"
-                    : "text-muted-foreground border-transparent hover:text-foreground"
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:text-emerald-600"
                 )}
               >
                 For Patients
@@ -55,14 +55,24 @@ export function LandingSection({ activeTab, setActiveTab }: LandingHeroProps) {
               <button
                 onClick={() => setActiveTab("hospital")}
                 className={cn(
-                  "text-lg font-semibold transition-all duration-300 pb-2 border-b-2",
+                  "text-lg font-semibold transition-all duration-300 pb-3 cursor-pointer ",
                   activeTab === "hospital"
-                    ? "text-teal-600 border-teal-600"
-                    : "text-muted-foreground border-transparent hover:text-foreground"
+                    ? "text-teal-600"
+                    : "text-muted-foreground hover:text-foreground hover:text-primary"
                 )}
               >
                 For Hospitals
               </button>
+              
+              {/* Sliding underline */}
+              <div 
+                className={cn(
+                  "absolute bottom-0 h-0.5 rounded-full transition-all duration-300 ease-out",
+                  activeTab === "patient" 
+                    ? "left-0 w-[106px] bg-primary" 
+                    : "left-[154px] w-[116px] bg-teal-600"
+                )}
+              />
             </div>
           </div>
         </div>

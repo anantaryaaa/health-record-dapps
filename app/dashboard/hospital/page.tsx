@@ -139,6 +139,8 @@ export default function HospitalDashboard() {
   );
 }
 
+import { searchPatients, PatientData as StoragePatientData } from "@/lib/patientStorage";
+
 // Step 1: Search Patient
 function SearchPatientStep({
   nikInput,
@@ -153,11 +155,36 @@ function SearchPatientStep({
   setShowScanner: (v: boolean) => void;
   onPatientFound: (data: ScannedPatientData) => void;
 }) {
+  const [searchResults, setSearchResults] = useState<StoragePatientData[]>([]);
+
+  // Search effect
+  useEffect(() => {
+    if (nikInput.length >= 2) {
+      const results = searchPatients(nikInput);
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  }, [nikInput]);
+
+  const handleSelectResult = (data: StoragePatientData) => {
+    // Map StoragePatientData to ScannedPatientData format expected by the dashboard
+    onPatientFound({
+      type: "medichain_patient",
+      walletAddress: data.walletAddress,
+      name: data.name,
+      nik: data.nik,
+      gender: data.gender,
+      age: data.age,
+      bloodType: data.bloodType
+    });
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
       <div className="w-full max-w-md text-center">
         {/* Icon */}
-        <div className="w-16 h-16 bg-secondary/50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <div className="w-16 h-16 flex items-center justify-center mx-auto mb-6">
           <Search className="w-8 h-8 text-teal-600" />
         </div>
 
@@ -166,7 +193,7 @@ function SearchPatientStep({
           Cari Data Pasien
         </h1>
         <p className="text-muted-foreground mb-8">
-          Scan QR Code dari aplikasi pasien atau input NIK manual untuk membuat rekam medis baru.
+          Scan QR Code dari aplikasi pasien atau input NIK/Nama manual untuk membuat rekam medis baru.
         </p>
 
         {/* NIK Input */}
@@ -176,10 +203,35 @@ function SearchPatientStep({
             type="text"
             value={nikInput}
             onChange={(e) => setNikInput(e.target.value)}
-            placeholder="Masukkan NIK Pasien..."
+            placeholder="Cari Nama atau NIK Pasien..."
             className="w-full h-14 pl-12 pr-4 bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
           />
         </div>
+
+        {/* Search Results */}
+        {searchResults.length > 0 && (
+          <div className="w-full bg-card border border-border rounded-xl shadow-lg mb-6 overflow-hidden text-left max-h-60 overflow-y-auto">
+             {searchResults.map((result) => (
+                <div 
+                  key={result.walletAddress}
+                  onClick={() => handleSelectResult(result)}
+                  className="p-4 hover:bg-muted/50 cursor-pointer border-b last:border-0 transition-colors"
+                >
+                  <p className="font-semibold text-foreground">{result.name}</p>
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>NIK: {result.nik}</span>
+                    <span>{result.gender} • {result.age} thn</span>
+                  </div>
+                </div>
+             ))}
+          </div>
+        )}
+
+        {nikInput.length > 2 && searchResults.length === 0 && (
+           <p className="text-sm text-red-600 mb-6">
+             Tidak ditemukan pasien dengan kata kunci "{nikInput}"
+           </p>
+        )}
 
         {/* Divider */}
         <div className="flex items-center gap-4 my-6">

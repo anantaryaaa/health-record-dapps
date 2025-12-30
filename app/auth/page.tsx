@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ConnectButton, useActiveAccount, lightTheme } from "thirdweb/react";
-import { client, wallets } from "@/lib/thirdWeb";
+import { ConnectButton, useActiveAccount, lightTheme, useConnect } from "thirdweb/react";
+import { client, wallets, liskSepolia } from "@/lib/thirdWeb";
+import { inAppWallet } from "thirdweb/wallets";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Building2, User, ArrowLeft, ChevronRight, Sparkles } from "lucide-react";
+import { Building2, User, ArrowLeft, ChevronRight, Sparkles, Fingerprint } from "lucide-react";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import { cn } from "@/lib/utils";
 
@@ -154,6 +155,7 @@ function WalletConnection({
 }) {
   const isPatient = role === "patient";
   const Icon = isPatient ? User : Building2;
+  const { connect, isConnecting } = useConnect();
 
   return (
     <motion.div
@@ -184,6 +186,53 @@ function WalletConnection({
             Connect your wallet to continue
           </p>
         </div>
+
+        {/* Biometric Login Option - Only for Patient */}
+        {isPatient && (
+          <>
+            <div className="mb-6">
+              <button
+                onClick={() => {
+                  connect(async () => {
+                    const wallet = inAppWallet();
+                    await wallet.connect({
+                      client,
+                      chain: liskSepolia,
+                      strategy: "passkey",
+                      type: "sign-in",
+                    });
+                    return wallet;
+                  });
+                }}
+                disabled={isConnecting}
+                className={cn(
+                  "w-full flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all duration-300",
+                  "bg-primary/5 border-primary/30 hover:bg-primary/10 hover:border-primary/50",
+                  isConnecting && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10">
+                  <Fingerprint className="w-5 h-5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-primary">
+                    {isConnecting ? "Connecting..." : "Login with Biometric"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Fingerprint, Face ID, or Windows Hello
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">or connect wallet</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+          </>
+        )}
 
         {/* Wallet Providers - Thirdweb ConnectButton */}
         <div className="flex justify-center mb-6">

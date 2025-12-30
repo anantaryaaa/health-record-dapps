@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 import { Wallet, FileText, QrCode, Share, ScanLine, ClipboardList, CheckCircle } from "lucide-react"
+import { DotPattern } from "./ui/dot-pattern"
 
 interface UserFlowProps {
   activeTab: "patient" | "hospital"
@@ -9,17 +10,17 @@ interface UserFlowProps {
 
 export function UserFlow({ activeTab }: UserFlowProps) {
   const patientSteps = [
-    { icon: Wallet, title: "Connect Wallet", desc: "Hubungkan wallet Anda" },
-    { icon: FileText, title: "Isi Data Diri", desc: "Lengkapi informasi dasar" },
-    { icon: QrCode, title: "Dapatkan QR Code", desc: "Identitas digital Anda" },
-    { icon: Share, title: "Bagikan ke RS", desc: "Izinkan akses data" },
+    { icon: Wallet, title: "Connect Wallet", desc: "Connect your wallet" },
+    { icon: FileText, title: "Fill Your Data", desc: "Complete basic information" },
+    { icon: QrCode, title: "Get QR Code", desc: "Your digital identity" },
+    { icon: Share, title: "Share to Hospital", desc: "Grant data access" },
   ]
 
   const hospitalSteps = [
-    { icon: Wallet, title: "Connect Wallet", desc: "Login dengan wallet RS" },
-    { icon: ScanLine, title: "Scan QR Pasien", desc: "Atau input NIK manual" },
-    { icon: ClipboardList, title: "Input Rekam Medis", desc: "Catat diagnosa & resep" },
-    { icon: CheckCircle, title: "Push to Chain", desc: "Data tersimpan aman" },
+    { icon: Wallet, title: "Connect Wallet", desc: "Login with hospital wallet" },
+    { icon: ScanLine, title: "Scan Patient QR", desc: "Or manual input ID" },
+    { icon: ClipboardList, title: "Input Medical Record", desc: "Record diagnosis & prescription" },
+    { icon: CheckCircle, title: "Push to Chain", desc: "Data stored securely" },
   ]
 
   const steps = activeTab === "patient" ? patientSteps : hospitalSteps
@@ -37,6 +38,8 @@ export function UserFlow({ activeTab }: UserFlowProps) {
         }`} />
       </div>
 
+      <DotPattern className="opacity-40" />
+
       <div className="max-w-6xl mx-auto relative z-10">
         {/* Section Header */}
         <motion.div 
@@ -46,13 +49,19 @@ export function UserFlow({ activeTab }: UserFlowProps) {
           viewport={{ once: true }}
         >
          
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
-            {activeTab === "patient" ? "Mulai dalam 4 Langkah" : "Akses Data dalam 4 Langkah"}
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 tracking-tight leading-[1.1]">
+            <span className={`bg-clip-text text-transparent ${
+              activeTab === "patient" 
+                ? "bg-gradient-to-r from-primary to-[#0077C0]" 
+                : "bg-gradient-to-r from-teal-600 to-teal-500"
+            }`}>
+              {activeTab === "patient" ? "The Simplicity Is Yours" : "Access Data in 4 Steps"}
+            </span>
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
             {activeTab === "patient" 
-              ? "Proses sederhana untuk mengamankan data kesehatan Anda"
-              : "Alur kerja yang efisien untuk mengakses dan mengelola data pasien"
+              ? "Simple process to secure your health data with only 4 steps and you can access your data at any time"
+              : "Efficient workflow to access and manage patient data"
             }
           </p>
         </motion.div>

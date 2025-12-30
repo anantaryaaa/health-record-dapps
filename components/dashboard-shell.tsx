@@ -23,7 +23,7 @@ const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/dashboard/patients", icon: Users, label: "Patient Data" },
   { href: "/dashboard/logs", icon: FileText, label: "Access Logs" },
-  { href: "/dashboard/settings", icon: Settings, label: "Settings" },
+  { href: "/dashboard/patient/settings", icon: Settings, label: "Settings" },
 ]
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {

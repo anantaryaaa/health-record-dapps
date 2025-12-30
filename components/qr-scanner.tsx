@@ -53,7 +53,7 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
         scanQRCode()
       }
     } catch {
-      setError("Tidak dapat mengakses kamera. Pastikan izin kamera diberikan.")
+      setError("Cannot access camera. Please grant camera permission.")
       setScanning(false)
     }
   }
@@ -142,13 +142,13 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
           onScanSuccess(data)
           onClose()
         } else {
-          setError("QR Code tidak valid. Pastikan ini adalah QR Code MediChain.")
+          setError("Invalid QR Code. Make sure this is a MediChain QR Code.")
         }
       } else {
-        setError("Tidak dapat membaca QR Code dari gambar. Pastikan gambar jelas.")
+        setError("Cannot read QR Code from image. Please ensure the image is clear.")
       }
     } catch {
-      setError("Gagal memproses gambar. Pastikan format gambar valid.")
+      setError("Failed to process image. Please ensure valid image format.")
     } finally {
       setProcessing(false)
       if (fileInputRef.current) {
@@ -165,10 +165,10 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
         onScanSuccess(data)
         onClose()
       } else {
-        setError("QR Code tidak valid. Pastikan ini adalah QR Code MediChain.")
+        setError("Invalid QR Code. Make sure this is a MediChain QR Code.")
       }
     } catch {
-      setError("Format data tidak valid.")
+      setError("Invalid data format.")
     }
   }
 
@@ -197,9 +197,9 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
           <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-3">
             <ScanLine className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-bold text-foreground">Scan QR Pasien</h3>
+          <h3 className="text-lg font-bold text-foreground">Scan Patient QR</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Scan QR code pasien untuk melihat data
+            Scan patient QR code to view data
           </p>
         </div>
 
@@ -232,7 +232,7 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
               className="w-full"
               onClick={() => setScanning(false)}
             >
-              Batal
+              Cancel
             </Button>
           </>
         ) : (
@@ -244,7 +244,7 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
                 onClick={() => setScanning(true)}
               >
                 <Camera className="w-4 h-4" />
-                Scan dengan Kamera
+                Scan with Camera
               </Button>
 
               {/* Gallery Upload */}
@@ -264,19 +264,19 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
                 {processing ? (
                   <>
                     <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    Memproses...
+                    Processing...
                   </>
                 ) : (
                   <>
                     <ImagePlus className="w-4 h-4" />
-                    Upload dari Gallery
+                    Upload from Gallery
                   </>
                 )}
               </Button>
 
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground">atau input manual</span>
+                <span className="text-xs text-muted-foreground">or manual input</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
 
@@ -285,7 +285,7 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
                 <textarea
                   value={manualInput}
                   onChange={(e) => setManualInput(e.target.value)}
-                  placeholder='Paste data QR (JSON format)...'
+                  placeholder='Paste QR data (JSON format)...'
                   className="w-full h-20 p-3 bg-muted/30 border border-border rounded-xl text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
                 <Button
@@ -295,7 +295,7 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
                   disabled={!manualInput}
                 >
                   <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Verifikasi Data
+                  Verify Data
                 </Button>
               </div>
             </div>

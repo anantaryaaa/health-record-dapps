@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { LandingSection } from "@/components/landing-section"
 import { Navbar } from "@/components/navbar"
+import { TechStack } from "@/components/tech-stack"
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"patient" | "hospital">("patient")
@@ -11,6 +12,7 @@ export default function Home() {
     <div className="relative min-h-screen ">
       <Navbar activeTab={activeTab} />
       <LandingSection activeTab={activeTab} setActiveTab={setActiveTab} />
+      <TechStack activeTab={activeTab} />
     </div>
   )
 }

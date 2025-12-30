@@ -6,13 +6,13 @@
 :root {
   /* New Color Palette */
   --background: #FAFAFA;
-  --foreground: #1D242B;
+  --foreground: #4B5563;
   
   --card: #FFFFFF;
-  --card-foreground: #1D242B;
+  --card-foreground: #4B5563;
   
   --popover: #FFFFFF;
-  --popover-foreground: #1D242B;
+  --popover-foreground: #4B5563;
   
   --primary: #0077C0;
   --primary-foreground: #FFFFFF;
@@ -43,7 +43,7 @@
   
   /* Sidebar */
   --sidebar: #FFFFFF;
-  --sidebar-foreground: #1D242B;
+  --sidebar-foreground: #4B5563;
   --sidebar-primary: #0077C0;
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #C7EEFF;

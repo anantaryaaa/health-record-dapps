@@ -21,7 +21,13 @@ export function Navbar({ activeTab = "patient" }: NavbarProps) {
       <div className="flex items-center gap-12 font-sans">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-sans font-bold text-xl tracking-tight text-foreground">
-          <span>MediChain</span>
+          <span className={`bg-clip-text text-transparent ${
+                activeTab === "patient" 
+                  ? "bg-gradient-to-r from-primary to-[#0077C0]" 
+                  : "bg-gradient-to-r from-teal-600 to-teal-500"
+              }`}>
+                MediChain
+              </span>
         </Link>
       </div>
 

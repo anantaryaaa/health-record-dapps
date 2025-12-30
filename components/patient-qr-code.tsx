@@ -213,7 +213,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
           onClick={onClose}
           className="w-full mt-3 py-3 text-white/70 hover:text-white text-sm font-medium transition-colors"
         >
-          Tutup Kartu
+          Close Card
         </button>
       </div>
     </div>

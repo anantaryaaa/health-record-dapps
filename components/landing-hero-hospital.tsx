@@ -33,10 +33,10 @@ export function LandingHeroHospital() {
           variants={itemVariants}
           className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-tight leading-[1.1] text-foreground"
         >
-          Akses Data Pasien
+          Access Patient Data
           <br />
           <span className="bg-gradient-to-r from-teal-600 to-teal-500 bg-clip-text text-transparent">
-            Dengan Izin Blockchain
+            Chained in Blockchain
           </span>
         </motion.h1>
 
@@ -44,8 +44,8 @@ export function LandingHeroHospital() {
           variants={itemVariants}
           className="text-lg md:text-xl text-muted-foreground mb-10 max-w-xl leading-relaxed"
         >
-          Kelola rekam medis dengan aman dan terenkripsi. 
-          <span className="text-foreground font-medium"> Tidak perlu formulir ulang</span> - data pasien tersedia instan dengan scan QR.
+          Manage medical records securely and encrypted. 
+          <span className="text-foreground font-medium"> No repetitive forms</span> - patient data instantly available via QR scan.
         </motion.p>
 
        
@@ -54,7 +54,7 @@ export function LandingHeroHospital() {
         <motion.div variants={itemVariants}>
           <Link href="/auth">
             <Button size="lg" className="h-14 px-8 gap-3 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-lg font-semibold rounded-xl">
-              Mulai Sekarang
+              Get Started
               <ChevronRight className="w-5 h-5" />
             </Button>
           </Link>
@@ -71,8 +71,42 @@ export function LandingHeroHospital() {
         <div className="relative">
           {/* Subtle glow behind image */}
           <div className="absolute -inset-4 bg-gradient-to-r from-teal-500/20 to-teal-400/20 rounded-3xl blur-2xl opacity-50" />
+          
+          {/* Floating Icons */}
+          <motion.div 
+            className="absolute -top-4 -left-4 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center z-20"
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Building2 className="w-6 h-6 text-teal-600" />
+          </motion.div>
+          
+          <motion.div 
+            className="absolute top-1/4 -right-6 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center z-20"
+            animate={{ y: [0, -10, 0] }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+          >
+            <QrCode className="w-6 h-6 text-teal-600" />
+          </motion.div>
+          
+          <motion.div 
+            className="absolute bottom-1/4 -left-6 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center z-20"
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          >
+            <Database className="w-6 h-6 text-teal-600" />
+          </motion.div>
+          
+          <motion.div 
+            className="absolute -bottom-4 right-8 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center z-20"
+            animate={{ y: [0, -6, 0] }}
+            transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+          >
+            <FileCheck className="w-6 h-6 text-teal-600" />
+          </motion.div>
+
           <Image
-            src="/landing-page-photo.png"
+            src="/landing-hero-hospitals.png"
             alt="Hospital Healthcare"
             width={900}
             height={900}

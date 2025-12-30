@@ -4,26 +4,22 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { useActiveAccount, useDisconnect, ConnectButton, lightTheme } from "thirdweb/react"
-import { client, wallets } from "@/lib/thirdWeb"
+import { useActiveAccount, useDisconnect, ConnectButton, lightTheme, useConnect } from "thirdweb/react"
+import { inAppWallet } from "thirdweb/wallets"
+import { client, wallets, liskSepolia } from "@/lib/thirdWeb"
 import { useRouter } from "next/navigation"
 import { PatientRegistrationForm } from "@/components/patient-registration-form"
 import { PatientQRCode } from "@/components/patient-qr-code"
-import { getPatientData, PatientData, clearAllAppData } from "@/lib/patientStorage"
+import { getPatientData, savePatientData, PatientData, clearAllAppData, getBiometricEnabled, setBiometricEnabled as saveBiometricEnabled } from "@/lib/patientStorage"
 import { 
   User, 
   ShieldCheck, 
   Fingerprint, 
-  Key, 
   ChevronRight, 
-  Info,
   FileText,
   Loader2,
   QrCode,
-  LogOut,
-  AlertTriangle,
-  Eye,
-  EyeOff
+  Settings
 } from "lucide-react"
 
 export default function PatientDashboard() {
@@ -36,6 +32,7 @@ export default function PatientDashboard() {
   const [showProfile, setShowProfile] = useState(false)
   const account = useActiveAccount()
   const { disconnect } = useDisconnect()
+  const { connect } = useConnect()
   const router = useRouter()
 
   const handleLogout = async () => {
@@ -50,11 +47,57 @@ export default function PatientDashboard() {
     router.push("/auth")
   }
 
+  // Handle biometric toggle
+  const handleBiometricToggle = async (enabled: boolean) => {
+    if (enabled && account) {
+      const currentAddress = account.address;
+      try {
+        const wallet = await connect(async () => {
+          const w = inAppWallet();
+          await w.connect({
+            client,
+            chain: liskSepolia,
+            strategy: "passkey",
+            type: "sign-up"
+          });
+          return w;
+        });
+
+        // Sync data to new passkey wallet if exists
+        const newAccount = wallet?.getAccount();
+        const newAddress = newAccount?.address;
+        
+        if (newAddress && currentAddress) {
+            const oldData = getPatientData(currentAddress);
+            if (oldData) {
+                const newData = { ...oldData, walletAddress: newAddress };
+                savePatientData(newData);
+                // Also update local state to reflect change immediately if wallet switched
+                setPatientData(newData); 
+            }
+        }
+
+        setBiometricEnabled(true)
+        saveBiometricEnabled(true)
+      } catch (e) {
+        console.error("Biometric setup failed:", e)
+        setBiometricEnabled(false)
+        saveBiometricEnabled(false)
+      }
+    } else {
+      setBiometricEnabled(false)
+      saveBiometricEnabled(false)
+    }
+  }
+
   useEffect(() => {
     if (!account) {
       router.push("/auth")
       return
     }
+
+    // Load biometric preference
+    setBiometricEnabled(getBiometricEnabled())
 
     // Check if patient is already registered
     const existingData = getPatientData(account.address)
@@ -115,7 +158,7 @@ export default function PatientDashboard() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Profil & Akun
+              Profile & Account
             </button>
             <button
               onClick={() => setActiveTab("history")}
@@ -125,7 +168,7 @@ export default function PatientDashboard() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Riwayat Medis
+              Medical History
             </button>
           </div>
 
@@ -156,95 +199,82 @@ export default function PatientDashboard() {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         {activeTab === "profile" ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Profile Card */}
-            <Card className="overflow-hidden">
+          <div className="space-y-6">
+            {/* Profile Card - Full Width */}
+            <Card>
               <CardContent className="p-6">
-                <div className="flex flex-col items-center text-center">
+                <div className="flex flex-col md:flex-row items-center gap-6">
                   {/* Avatar */}
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-muted to-muted/50 border-4 border-background shadow-lg flex items-center justify-center mb-4">
-                    <User className="w-12 h-12 text-muted-foreground" />
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 border-4 border-background shadow-lg flex items-center justify-center flex-shrink-0">
+                    <User className="w-12 h-12 text-primary" />
                   </div>
 
-                  {/* Name & NIK */}
-                  <h2 className="text-xl font-bold text-foreground mb-1">{patientData.name}</h2>
-                  <p className="text-sm text-muted-foreground font-mono mb-6">{patientData.nik}</p>
-
-                  {/* Stats */}
-                  <div className="grid grid-cols-3 gap-4 w-full mb-6">
-                    <div className="text-center p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Darah</p>
-                      <p className="text-lg font-bold text-foreground">{patientData.bloodType}</p>
-                    </div>
-                    <div className="text-center p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Gender</p>
-                      <p className="text-lg font-bold text-foreground">{patientData.gender}</p>
-                    </div>
-                    <div className="text-center p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-center text-muted-foreground uppercase tracking-wide">Usia</p>
-                      <p className="text-lg font-bold text-foreground">{patientData.age} tahun</p>
+                  {/* Info */}
+                  <div className="flex-1 text-center md:text-left">
+                    <h2 className="text-2xl font-bold text-foreground mb-1">{patientData.name}</h2>
+                    <p className="text-sm text-muted-foreground font-mono mb-4">{patientData.nik}</p>
+                    
+                    {/* Stats Row */}
+                    <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                      <div className="px-4 py-2 bg-muted/50 rounded-lg">
+                        <span className="text-xs text-muted-foreground uppercase">Blood</span>
+                        <p className="font-bold text-foreground">{patientData.bloodType}</p>
+                      </div>
+                      <div className="px-4 py-2 bg-muted/50 rounded-lg">
+                        <span className="text-xs text-muted-foreground uppercase">Gender</span>
+                        <p className="font-bold text-foreground">{patientData.gender}</p>
+                      </div>
+                      <div className="px-4 py-2 bg-muted/50 rounded-lg">
+                        <span className="text-xs text-muted-foreground uppercase">Age</span>
+                        <p className="font-bold text-foreground">{patientData.age} yrs</p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* QR Code Button */}
-                  <Button 
-                    className="w-full gap-2 bg-gradient-to-r from-primary to-[#0077C0] hover:opacity-90"
-                    onClick={() => setShowQR(true)}
-                  >
-                    <QrCode className="w-4 h-4" />
-                    Tampilkan QR Code
-                  </Button>
+                  {/* Buttons */}
+                  <div className="flex flex-col gap-2 w-full md:w-auto">
+                    <Button 
+                      className="gap-2 bg-gradient-to-r from-primary to-[#0077C0] hover:opacity-90"
+                      onClick={() => setShowQR(true)}
+                    >
+                      <QrCode className="w-4 h-4" />
+                      Show QR Code
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => router.push("/dashboard/patient/settings")}
+                    >
+                      <Settings className="w-4 h-4" />
+                      Edit Profile
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Security Settings */}
+            {/* Security Settings - Below */}
             <Card>
               <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-6">
+                <div className="flex items-center gap-2 mb-4">
                   <ShieldCheck className="w-5 h-5 text-primary" />
-                  <h3 className="text-lg font-semibold text-foreground">Pengaturan Keamanan</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Security Settings</h3>
                 </div>
 
-                <div className="space-y-4">
-                  {/* Biometric Login */}
-                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Fingerprint className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">Login Biometrik</p>
-                        <p className="text-xs text-muted-foreground">FaceID / Fingerprint aktif</p>
-                      </div>
+                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Fingerprint className="w-5 h-5 text-primary" />
                     </div>
-                    <Switch
-                      checked={biometricEnabled}
-                      onCheckedChange={setBiometricEnabled}
-                    />
-                  </div>
-
-                  {/* Backup Private Key */}
-                  <button className="w-full flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors text-left">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                        <Key className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">Backup Private Key</p>
-                        <p className="text-xs text-muted-foreground">Cadangkan kunci akses Anda</p>
-                      </div>
+                    <div>
+                      <p className="font-medium text-foreground">Biometric Login</p>
+                      <p className="text-xs text-muted-foreground">FaceID / Fingerprint active</p>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                  </button>
-
-                  {/* Info Box */}
-                  <div className="flex gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl">
-                    <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-muted-foreground">
-                      Kunci pribadi tersimpan aman di perangkat ini. Pastikan Anda melakukan backup untuk pemulihan di perangkat lain.
-                    </p>
                   </div>
+                  <Switch
+                    checked={biometricEnabled}
+                    onCheckedChange={handleBiometricToggle}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -256,7 +286,7 @@ export default function PatientDashboard() {
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-6">
                   <FileText className="w-5 h-5 text-primary" />
-                  <h3 className="text-lg font-semibold text-foreground">Riwayat Medis</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Medical History</h3>
                 </div>
                 
                 {/* Medical Records List */}
@@ -269,17 +299,17 @@ export default function PatientDashboard() {
                         <h4 className="font-semibold text-foreground mt-1">Influenza A</h4>
                       </div>
                       <span className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-medium">
-                        Selesai
+                        Completed
                       </span>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Keluhan / Gejala</p>
+                        <p className="text-xs text-muted-foreground mb-1">Symptoms</p>
                         <p className="text-sm text-foreground">Demam tinggi, batuk kering, nyeri otot, sakit kepala, lemas</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Tindakan / Resep</p>
+                        <p className="text-xs text-muted-foreground mb-1">Treatment / Prescription</p>
                         <p className="text-sm text-foreground">Paracetamol 500mg 3x1, Oseltamivir 75mg 2x1, Istirahat total 5 hari</p>
                       </div>
                     </div>
@@ -298,17 +328,17 @@ export default function PatientDashboard() {
                         <h4 className="font-semibold text-foreground mt-1">Gastritis Akut</h4>
                       </div>
                       <span className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-medium">
-                        Selesai
+                        Completed
                       </span>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Keluhan / Gejala</p>
+                        <p className="text-xs text-muted-foreground mb-1">Symptoms</p>
                         <p className="text-sm text-foreground">Nyeri ulu hati, mual, kembung, tidak nafsu makan</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Tindakan / Resep</p>
+                        <p className="text-xs text-muted-foreground mb-1">Treatment / Prescription</p>
                         <p className="text-sm text-foreground">Omeprazole 20mg 1x1, Antasida 3x1, Hindari makanan pedas & asam</p>
                       </div>
                     </div>
@@ -327,17 +357,17 @@ export default function PatientDashboard() {
                         <h4 className="font-semibold text-foreground mt-1">Tension Headache</h4>
                       </div>
                       <span className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-medium">
-                        Selesai
+                        Completed
                       </span>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Keluhan / Gejala</p>
+                        <p className="text-xs text-muted-foreground mb-1">Symptoms</p>
                         <p className="text-sm text-foreground">Sakit kepala tegang, leher kaku, mata lelah, sulit konsentrasi</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Tindakan / Resep</p>
+                        <p className="text-xs text-muted-foreground mb-1">Treatment / Prescription</p>
                         <p className="text-sm text-foreground">Ibuprofen 400mg bila perlu, Myonal 50mg 2x1, Fisioterapi leher</p>
                       </div>
                     </div>
