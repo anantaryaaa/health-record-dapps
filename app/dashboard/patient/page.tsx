@@ -49,12 +49,14 @@ export default function PatientDashboard() {
   }
 
   const { registerBiometric, isAuthenticating } = useBiometricAuth()
-  // Alias for clarity in this context: we treat 'authenticating' (connecting) as 'registering/switching' process
+  // Alias for clarity in this context
   const isRegistering = isAuthenticating;
+  const [isMigrating, setIsMigrating] = useState(false);
 
   // Handle biometric toggle
   const handleBiometricToggle = async (enabled: boolean) => {
     if (enabled && account) {
+      setIsMigrating(true); // Start blocking UI
       const currentAddress = account.address;
       const currentData = getPatientData(currentAddress);
       
@@ -87,6 +89,7 @@ export default function PatientDashboard() {
         setBiometricEnabled(false)
         saveBiometricEnabled(false)
       }
+      setIsMigrating(false); // Release blocking
     } else {
       setBiometricEnabled(false)
       saveBiometricEnabled(false)
@@ -117,10 +120,13 @@ export default function PatientDashboard() {
   }
 
   // While switching wallets or loading, show loader
-  if (isLoading || isRegistering || !account) {
+  if (isLoading || isRegistering || isMigrating || !account) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <span className="ml-2 text-primary font-medium">
+            {isMigrating ? "Migrating data..." : "Loading..."}
+        </span>
       </div>
     )
   }
