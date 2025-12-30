@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ConnectButton, useActiveAccount, lightTheme, useConnect } from "thirdweb/react";
-import { client, wallets, liskSepolia } from "@/lib/thirdWeb";
-import { inAppWallet } from "thirdweb/wallets";
+import { ConnectButton, useActiveAccount, lightTheme } from "thirdweb/react";
+import { client, wallets } from "@/lib/thirdWeb";
+import { useBiometricAuth } from "@/hooks/use-biometric-auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, User, ArrowLeft, ChevronRight, Sparkles, Fingerprint } from "lucide-react";
@@ -123,8 +123,8 @@ function RoleSelection({
               <Building2 className="w-7 h-7 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-lg text-emerald-500">I&apos;m a Hospital</p>
-              <p className="text-sm text-foreground">Manage and access patient data with consent</p>
+              <p className="font-semibold text-lg text-emerald-500">Connect Hospital Node</p>
+              <p className="text-sm text-foreground">Manage and access patient data with consent in blockchain</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
           </button>
@@ -155,7 +155,7 @@ function WalletConnection({
 }) {
   const isPatient = role === "patient";
   const Icon = isPatient ? User : Building2;
-  const { connect, isConnecting } = useConnect();
+  const { loginWithBiometric, isAuthenticating } = useBiometricAuth();
 
   return (
     <motion.div
@@ -192,23 +192,12 @@ function WalletConnection({
           <>
             <div className="mb-6">
               <button
-                onClick={() => {
-                  connect(async () => {
-                    const wallet = inAppWallet();
-                    await wallet.connect({
-                      client,
-                      chain: liskSepolia,
-                      strategy: "passkey",
-                      type: "sign-in",
-                    });
-                    return wallet;
-                  });
-                }}
-                disabled={isConnecting}
+                onClick={() => loginWithBiometric()}
+                disabled={isAuthenticating}
                 className={cn(
                   "w-full flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all duration-300",
                   "bg-primary/5 border-primary/30 hover:bg-primary/10 hover:border-primary/50",
-                  isConnecting && "opacity-50 cursor-not-allowed"
+                  isAuthenticating && "opacity-50 cursor-not-allowed"
                 )}
               >
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10">
@@ -216,7 +205,7 @@ function WalletConnection({
                 </div>
                 <div className="text-left">
                   <p className="font-semibold text-primary">
-                    {isConnecting ? "Connecting..." : "Login with Biometric"}
+                    {isAuthenticating ? "Connecting..." : "Login with Biometric"}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Fingerprint, Face ID, or Windows Hello
