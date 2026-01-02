@@ -44,13 +44,13 @@ export function TechStack({ activeTab }: TechStackProps) {
             </div>
            
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
-              <span className="text-foreground">Built With </span>
+              <span className="text-foreground">Application </span>
               <span className={`bg-clip-text text-transparent ${
                 isPatient 
                   ? "bg-gradient-to-r from-primary to-[#0077C0]"    
                   : "bg-gradient-to-r from-teal-600 to-teal-500"
               }`}>
-                Modern Tech
+                <br />Tech Stack
               </span>
             </h2>
             

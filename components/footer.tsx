@@ -31,8 +31,9 @@ export function Footer({ activeTab = "patient" }: FooterProps) {
               MediChain
             </span>
             <span className="text-muted-foreground text-sm">
-              © {new Date().getFullYear()}
+              © {new Date().getFullYear()}. All Right Reserved.
             </span>
+            
           </div>
 
           {/* Social Icons */}
