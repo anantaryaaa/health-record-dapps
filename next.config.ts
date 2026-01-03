@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   ],
   // Enable Turbopack
   turbopack: {
-    // Add any specific Turbopack resolve aliases if needed, otherwise empty object to suppress warning
+    // Ad any specific Turbopack resolve aliases if needed, otherwise empty object to suppress warning
   },
   webpack: (config) => {
     config.externals.push({
