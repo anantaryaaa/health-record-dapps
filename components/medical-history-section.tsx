@@ -40,87 +40,87 @@ export interface MedicalRecord {
 export const medicalRecords: MedicalRecord[] = [
   {
     id: 1,
-    noRekamMedik: "RM-2024-00145",
-    tanggalMasuk: "15 Desember 2024",
-    tanggalKeluar: "15 Desember 2024",
+    noRekamMedik: "MR-2024-00145",
+    tanggalMasuk: "December 15, 2024",
+    tanggalKeluar: "December 15, 2024",
     diagnosisUtama: "Influenza A",
     icdCode: "J10.1",
     diagnosisSekunder: "",
-    keluhan: "Demam tinggi, batuk kering, nyeri otot, sakit kepala, lemas",
-    riwayatAlergi: "Tidak ada",
-    tindakan: "Pemeriksaan fisik, cek suhu",
-    resepObat: "Paracetamol 500mg 3x1, Oseltamivir 75mg 2x1, Istirahat total 5 hari",
-    keadaanKeluar: "Membaik",
+    keluhan: "High fever, dry cough, muscle pain, headache, fatigue",
+    riwayatAlergi: "None",
+    tindakan: "Physical examination, temperature check",
+    resepObat: "Paracetamol 500mg 3x1, Oseltamivir 75mg 2x1, Complete rest for 5 days",
+    keadaanKeluar: "Improved",
     dokterPenanggungJawab: "dr. Sarah Wijaya, Sp.PD",
-    hospital: "RS Siloam Jakarta Selatan",
+    hospital: "Siloam Hospital South Jakarta",
     category: "Diagnose"
   },
   {
     id: 2,
-    noRekamMedik: "RM-2024-00098",
-    tanggalMasuk: "28 November 2024",
-    tanggalKeluar: "28 November 2024",
-    diagnosisUtama: "Gastritis Akut",
+    noRekamMedik: "MR-2024-00098",
+    tanggalMasuk: "November 28, 2024",
+    tanggalKeluar: "November 28, 2024",
+    diagnosisUtama: "Acute Gastritis",
     icdCode: "K29.0",
     diagnosisSekunder: "",
-    keluhan: "Nyeri ulu hati, mual, kembung, tidak nafsu makan",
-    riwayatAlergi: "Tidak ada",
-    tindakan: "Endoskopi",
-    resepObat: "Omeprazole 20mg 1x1, Antasida 3x1, Hindari makanan pedas & asam",
-    keadaanKeluar: "Membaik",
+    keluhan: "Epigastric pain, nausea, bloating, loss of appetite",
+    riwayatAlergi: "None",
+    tindakan: "Endoscopy",
+    resepObat: "Omeprazole 20mg 1x1, Antacid 3x1, Avoid spicy & acidic foods",
+    keadaanKeluar: "Improved",
     dokterPenanggungJawab: "dr. Budi Santoso, Sp.PD-KGEH",
-    hospital: "RS Pondok Indah Bintaro",
+    hospital: "Pondok Indah Hospital Bintaro",
     category: "Diagnose"
   },
   {
     id: 3,
-    noRekamMedik: "RM-2024-00075",
-    tanggalMasuk: "5 Oktober 2024",
-    tanggalKeluar: "5 Oktober 2024",
+    noRekamMedik: "MR-2024-00075",
+    tanggalMasuk: "October 5, 2024",
+    tanggalKeluar: "October 5, 2024",
     diagnosisUtama: "Tension Headache",
     icdCode: "G44.2",
     diagnosisSekunder: "",
-    keluhan: "Sakit kepala tegang, leher kaku, mata lelah, sulit konsentrasi",
-    riwayatAlergi: "Alergi Ibuprofen",
-    tindakan: "CT Scan kepala",
-    resepObat: "Paracetamol 500mg bila perlu, Myonal 50mg 2x1, Fisioterapi leher",
-    keadaanKeluar: "Membaik",
+    keluhan: "Tension headache, stiff neck, eye fatigue, difficulty concentrating",
+    riwayatAlergi: "Ibuprofen allergy",
+    tindakan: "Head CT Scan",
+    resepObat: "Paracetamol 500mg as needed, Myonal 50mg 2x1, Neck physiotherapy",
+    keadaanKeluar: "Improved",
     dokterPenanggungJawab: "dr. Linda Kusuma, Sp.S",
-    hospital: "Klinik Medika Surabaya",
+    hospital: "Medika Clinic Surabaya",
     category: "Diagnose"
   },
   {
     id: 4,
-    noRekamMedik: "RM-2024-00142",
-    tanggalMasuk: "10 Desember 2024",
-    tanggalKeluar: "10 Desember 2024",
+    noRekamMedik: "MR-2024-00142",
+    tanggalMasuk: "December 10, 2024",
+    tanggalKeluar: "December 10, 2024",
     diagnosisUtama: "Complete Blood Count (CBC)",
     icdCode: "Z01.7",
     diagnosisSekunder: "",
-    keluhan: "Pemeriksaan rutin",
-    riwayatAlergi: "Tidak ada",
-    tindakan: "Pengambilan sampel darah",
-    resepObat: "Hemoglobin: 14.5 g/dL, Leukosit: 7.200/µL, Trombosit: 250.000/µL",
-    keadaanKeluar: "Selesai",
+    keluhan: "Routine checkup",
+    riwayatAlergi: "None",
+    tindakan: "Blood sample collection",
+    resepObat: "Hemoglobin: 14.5 g/dL, Leukocytes: 7,200/µL, Platelets: 250,000/µL",
+    keadaanKeluar: "Complete",
     dokterPenanggungJawab: "dr. Andi Pratama",
-    hospital: "Lab Prodia Jakarta",
+    hospital: "Prodia Lab Jakarta",
     category: "Lab"
   },
   {
     id: 5,
-    noRekamMedik: "RM-2024-00056",
-    tanggalMasuk: "1 November 2024",
-    tanggalKeluar: "1 November 2024",
+    noRekamMedik: "MR-2024-00056",
+    tanggalMasuk: "November 1, 2024",
+    tanggalKeluar: "November 1, 2024",
     diagnosisUtama: "Lipid Profile",
     icdCode: "Z13.6",
     diagnosisSekunder: "",
-    keluhan: "Pemeriksaan kolesterol",
-    riwayatAlergi: "Tidak ada",
-    tindakan: "Pengambilan sampel darah puasa",
+    keluhan: "Cholesterol check",
+    riwayatAlergi: "None",
+    tindakan: "Fasting blood sample collection",
     resepObat: "Total Cholesterol: 195 mg/dL, HDL: 55 mg/dL, LDL: 120 mg/dL, Triglycerides: 100 mg/dL",
-    keadaanKeluar: "Selesai",
+    keadaanKeluar: "Complete",
     dokterPenanggungJawab: "dr. Andi Pratama",
-    hospital: "Lab Prodia Jakarta",
+    hospital: "Prodia Lab Jakarta",
     category: "Lab"
   }
 ]
@@ -158,7 +158,7 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Rekam Medis - ${patientData.name}</title>
+          <title>Medical Record - ${patientData.name}</title>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
@@ -284,9 +284,9 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
               font-size: 10px;
               font-weight: 600;
             }
-            .status-badge.membaik { background: #d1fae5; color: #059669; }
-            .status-badge.sembuh { background: #dbeafe; color: #1d4ed8; }
-            .status-badge.selesai { background: #e0e7ff; color: #4f46e5; }
+            .status-badge.improved { background: #d1fae5; color: #059669; }
+            .status-badge.cured { background: #dbeafe; color: #1d4ed8; }
+            .status-badge.complete { background: #e0e7ff; color: #4f46e5; }
             @media print {
               body { padding: 0; }
               .container { border: 1px solid #333; }
@@ -301,104 +301,104 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
                 <h1>MEDICHAIN</h1>
                 <p>Decentralized Health Record</p>
               </div>
-              <span class="badge">REKAM MEDIS</span>
+              <span class="badge">MEDICAL RECORD</span>
             </div>
 
             <!-- Title -->
             <div class="title-bar">
-              <h2>FORMULIR REKAM MEDIS</h2>
+              <h2>MEDICAL RECORD FORM</h2>
             </div>
 
             <!-- Content -->
             <div class="content">
               <!-- Patient Info Section -->
-              <div class="section-title">DATA PASIEN</div>
+              <div class="section-title">PATIENT DATA</div>
               <div class="patient-info">
                 <div class="row">
-                  <div class="cell label">Nama Pasien</div>
+                  <div class="cell label">Patient Name</div>
                   <div class="cell value">${patientData.name}</div>
                 </div>
                 <div class="row">
-                  <div class="cell label">NIK</div>
+                  <div class="cell label">ID Number</div>
                   <div class="cell value">${patientData.nik}</div>
                 </div>
                 <div class="row">
-                  <div class="cell label">Jenis Kelamin</div>
+                  <div class="cell label">Gender</div>
                   <div class="cell value">${patientData.gender}</div>
                 </div>
                 <div class="row">
-                  <div class="cell label">Usia</div>
-                  <div class="cell value">${patientData.age} Tahun</div>
+                  <div class="cell label">Age</div>
+                  <div class="cell value">${patientData.age} Years</div>
                 </div>
                 <div class="row">
-                  <div class="cell label">Golongan Darah</div>
+                  <div class="cell label">Blood Type</div>
                   <div class="cell value">${patientData.bloodType}</div>
                 </div>
                 <div class="row">
-                  <div class="cell label">Riwayat Alergi</div>
+                  <div class="cell label">Allergy History</div>
                   <div class="cell value">${record.riwayatAlergi || "-"}</div>
                 </div>
               </div>
 
               <!-- Record Info Section -->
-              <div class="section-title">DATA KUNJUNGAN</div>
+              <div class="section-title">VISIT DATA</div>
               <div class="row">
-                <div class="cell label">No. Rekam Medik</div>
+                <div class="cell label">Medical Record No.</div>
                 <div class="cell value">${record.noRekamMedik}</div>
               </div>
               <div class="row">
-                <div class="cell label">Tanggal Masuk</div>
+                <div class="cell label">Admission Date</div>
                 <div class="cell value">${record.tanggalMasuk}</div>
               </div>
               <div class="row">
-                <div class="cell label">Tanggal Keluar</div>
+                <div class="cell label">Discharge Date</div>
                 <div class="cell value">${record.tanggalKeluar || "-"}</div>
               </div>
               <div class="row">
-                <div class="cell label">Fasilitas Kesehatan</div>
+                <div class="cell label">Healthcare Facility</div>
                 <div class="cell value">${record.hospital}</div>
               </div>
 
               <!-- Diagnosis Section -->
               <div class="section-title">DIAGNOSIS</div>
               <div class="row">
-                <div class="cell label">Diagnosa Utama</div>
+                <div class="cell label">Primary Diagnosis</div>
                 <div class="cell value">${record.diagnosisUtama}</div>
               </div>
               <div class="row">
-                <div class="cell label">Kode ICD-X</div>
+                <div class="cell label">ICD-X Code</div>
                 <div class="cell value">${record.icdCode || "-"}</div>
               </div>
               <div class="row">
-                <div class="cell label">Diagnosa Sekunder</div>
+                <div class="cell label">Secondary Diagnosis</div>
                 <div class="cell value">${record.diagnosisSekunder || "-"}</div>
               </div>
 
               <!-- Clinical Section -->
-              <div class="section-title">DATA KLINIS</div>
+              <div class="section-title">CLINICAL DATA</div>
               <div class="row">
-                <div class="cell label">Keluhan / Gejala</div>
+                <div class="cell label">Symptoms / Complaints</div>
                 <div class="cell value">${record.keluhan}</div>
               </div>
               <div class="row">
-                <div class="cell label">Tindakan</div>
+                <div class="cell label">Procedure</div>
                 <div class="cell value">${record.tindakan || "-"}</div>
               </div>
               <div class="row">
-                <div class="cell label">Resep / Terapi</div>
+                <div class="cell label">Prescription / Therapy</div>
                 <div class="cell value">${record.resepObat}</div>
               </div>
 
               <!-- Outcome Section -->
-              <div class="section-title">HASIL KUNJUNGAN</div>
+              <div class="section-title">VISIT OUTCOME</div>
               <div class="row">
-                <div class="cell label">Keadaan Keluar</div>
+                <div class="cell label">Discharge Status</div>
                 <div class="cell value">
                   <span class="status-badge ${record.keadaanKeluar.toLowerCase()}">${record.keadaanKeluar}</span>
                 </div>
               </div>
               <div class="row">
-                <div class="cell label">Dokter Penanggung Jawab</div>
+                <div class="cell label">Attending Physician</div>
                 <div class="cell value">${record.dokterPenanggungJawab}</div>
               </div>
             </div>
@@ -406,11 +406,11 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
             <!-- Footer -->
             <div class="footer">
               <div class="date">
-                Dicetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                Printed: ${new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
               </div>
               <div class="signature">
                 <div class="line"></div>
-                <p>Tanda Tangan Dokter</p>
+                <p>Doctor's Signature</p>
               </div>
             </div>
           </div>
@@ -615,7 +615,7 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
                 {/* Keluhan */}
                 <div>
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Keluhan / Gejala
+                    Symptoms / Complaints
                   </h4>
                   <p className="text-foreground">{selectedRecord.keluhan}</p>
                 </div>
@@ -624,7 +624,7 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
                 {selectedRecord.riwayatAlergi && (
                   <div>
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Riwayat Alergi
+                      Allergy History
                     </h4>
                     <p className="text-foreground">{selectedRecord.riwayatAlergi}</p>
                   </div>
@@ -634,7 +634,7 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
                 {selectedRecord.tindakan && (
                   <div>
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Tindakan
+                      Procedure
                     </h4>
                     <p className="text-foreground">{selectedRecord.tindakan}</p>
                   </div>
@@ -643,7 +643,7 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
                 {/* Resep */}
                 <div>
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    {selectedRecord.category === "Diagnose" ? "Resep / Terapi" : "Hasil Pemeriksaan"}
+                    {selectedRecord.category === "Diagnose" ? "Prescription / Therapy" : "Test Results"}
                   </h4>
                   <p className="text-foreground">{selectedRecord.resepObat}</p>
                 </div>
@@ -652,7 +652,7 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
                 {selectedRecord.diagnosisSekunder && (
                   <div>
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Diagnosa Sekunder
+                      Secondary Diagnosis
                     </h4>
                     <p className="text-foreground">{selectedRecord.diagnosisSekunder}</p>
                   </div>
@@ -676,7 +676,7 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
                   className="w-full gap-2 mt-4"
                 >
                   <Printer className="w-4 h-4" />
-                  Cetak Rekam Medis
+                  Print Medical Record
                 </Button>
               </div>
             </CardContent>

@@ -38,7 +38,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
     : patientData.nik
   
   // Format registered date
-  const registeredDate = new Date(patientData.registeredAt).toLocaleDateString('id-ID', {
+  const registeredDate = new Date(patientData.registeredAt).toLocaleDateString('en-US', {
     day: 'numeric',
     month: 'long',
     year: 'numeric'
@@ -71,7 +71,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Kartu Pasien - ${patientData.name}</title>
+          <title>Patient Card - ${patientData.name}</title>
           <style>
             @page { size: 86mm 54mm; margin: 0; }
             * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -200,7 +200,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
                 </div>
                 <div class="stats">
                   <div class="stat">
-                    <div class="stat-label">Darah</div>
+                    <div class="stat-label">Blood</div>
                     <div class="stat-value">${patientData.bloodType}</div>
                   </div>
                   <div class="stat">
@@ -208,7 +208,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
                     <div class="stat-value">${patientData.gender}</div>
                   </div>
                   <div class="stat">
-                    <div class="stat-label">Usia</div>
+                    <div class="stat-label">Age</div>
                     <div class="stat-value">${patientData.age}</div>
                   </div>
                 </div>
@@ -216,7 +216,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
             </div>
             <div class="footer">
               <span>${shortAddress}</span>
-              <span>Terdaftar: ${registeredDate}</span>
+              <span>Registered: ${registeredDate}</span>
             </div>
           </div>
         </body>
@@ -280,9 +280,9 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
 
       // Draw stats
       const stats = [
-        { label: "Darah", value: patientData.bloodType },
+        { label: "Blood", value: patientData.bloodType },
         { label: "Gender", value: patientData.gender },
-        { label: "Usia", value: patientData.age.toString() }
+        { label: "Age", value: patientData.age.toString() }
       ]
       
       stats.forEach((stat, i) => {
@@ -305,12 +305,12 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
       ctx.font = "10px monospace"
       ctx.fillText(shortAddress, 20, 280)
       ctx.textAlign = "right"
-      ctx.fillText(`Terdaftar: ${registeredDate}`, 480, 280)
+      ctx.fillText(`Registered: ${registeredDate}`, 480, 280)
 
       // Download
       const pngFile = canvas.toDataURL("image/png")
       const downloadLink = document.createElement("a")
-      downloadLink.download = `kartu-pasien-${patientData.name.replace(/\s+/g, "-").toLowerCase()}.png`
+      downloadLink.download = `patient-card-${patientData.name.replace(/\s+/g, "-").toLowerCase()}.png`
       downloadLink.href = pngFile
       downloadLink.click()
     }
@@ -395,7 +395,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
                 </div>
                 <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-white/15 rounded-lg text-center">
                   <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-secondary mx-auto mb-0.5 sm:mb-1" />
-                  <p className="text-white font-bold text-xs sm:text-sm">{patientData.age} thn</p>
+                  <p className="text-white font-bold text-xs sm:text-sm">{patientData.age} yrs</p>
                 </div>
               </div>
             </div>
@@ -404,7 +404,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
           {/* Footer */}
           <div className="relative flex flex-col sm:flex-row justify-between items-center gap-1 sm:gap-0 mt-3 sm:mt-4 pt-2 sm:pt-3 border-t border-white/20">
             <p className="text-white/60 font-mono text-[10px] sm:text-xs">{shortAddress}</p>
-            <p className="text-white/60 text-[10px] sm:text-xs">Terdaftar: {registeredDate}</p>
+            <p className="text-white/60 text-[10px] sm:text-xs">Registered: {registeredDate}</p>
           </div>
         </div>
 
@@ -426,7 +426,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
           onClick={onClose}
           className="w-full mt-3 py-3 text-white/70 hover:text-red-500  text-sm font-medium transition-colors "
         >
-          Tutup
+          Close
         </button>
       </div>
     </div>

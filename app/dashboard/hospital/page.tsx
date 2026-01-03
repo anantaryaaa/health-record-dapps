@@ -1,6 +1,7 @@
 "use client";
 
-import { useActiveAccount } from "thirdweb/react";
+import { useActiveAccount, ConnectButton } from "thirdweb/react";
+import { client, hospitalTheme, wallets, liskSepolia } from "@/lib/thirdWeb";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import jsQR from "jsqr";
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { isHospitalRegistered, getHospitalData } from "@/lib/hospitalStorage";
 
 // Types
 interface ScannedPatientData {
@@ -78,14 +80,28 @@ export default function HospitalDashboard() {
   // Search state
   const [nikInput, setNikInput] = useState("");
   const [showScanner, setShowScanner] = useState(false);
+  
+  // Hospital data
+  const hospitalData = account ? getHospitalData(account.address) : null;
 
   useEffect(() => {
     if (!account) {
       router.push("/auth");
+      return;
+    }
+    
+    // Check if hospital is registered, redirect to registration if not
+    if (!isHospitalRegistered(account.address)) {
+      router.push("/dashboard/hospital/registration");
     }
   }, [account, router]);
 
   if (!account) {
+    return null;
+  }
+  
+  // Show loading while checking registration
+  if (!hospitalData) {
     return null;
   }
 
@@ -136,12 +152,13 @@ export default function HospitalDashboard() {
             </div>
           </div>
           
-          <button
-            onClick={() => router.push("/auth")}
-            className="text-teal-600 hover:text-teal-700 font-medium text-sm"
-          >
-            Keluar
-          </button>
+          {/* Thirdweb Connect Wallet Button */}
+          <ConnectButton 
+            client={client} 
+            theme={hospitalTheme}
+            wallets={wallets}
+            chain={liskSepolia}
+          />
         </div>
       </header>
 
@@ -226,10 +243,10 @@ function SearchPatientStep({
 
         {/* Title */}
         <h1 className="text-3xl font-bold text-foreground mb-3">
-          Cari Data Pasien
+          Search Patient Data
         </h1>
         <p className="text-muted-foreground mb-8">
-          Scan QR Code dari aplikasi pasien atau input NIK/Nama manual untuk membuat rekam medis baru.
+          Scan QR Code from patient&apos;s app or manually input ID/Name to create a new medical record.
         </p>
 
         {/* NIK Input */}
@@ -239,7 +256,7 @@ function SearchPatientStep({
             type="text"
             value={nikInput}
             onChange={(e) => setNikInput(e.target.value)}
-            placeholder="Cari Nama atau NIK Pasien..."
+            placeholder="Search Patient Name or ID..."
             className="w-full h-14 pl-12 pr-4 bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
           />
         </div>
@@ -255,8 +272,8 @@ function SearchPatientStep({
                 >
                   <p className="font-semibold text-foreground">{result.name}</p>
                   <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>NIK: {result.nik}</span>
-                    <span>{result.gender} • {result.age} thn</span>
+                    <span>ID: {result.nik}</span>
+                    <span>{result.gender} • {result.age} yrs</span>
                   </div>
                 </div>
              ))}
@@ -265,14 +282,14 @@ function SearchPatientStep({
 
         {nikInput.length > 2 && searchResults.length === 0 && (
            <p className="text-sm text-red-600 mb-6">
-             Tidak ditemukan pasien dengan kata kunci "{nikInput}"
+             No patient found with keyword &quot;{nikInput}&quot;
            </p>
         )}
 
         {/* Divider */}
         <div className="flex items-center gap-4 my-6">
           <div className="flex-1 h-px bg-border" />
-          <span className="text-sm text-muted-foreground">ATAU</span>
+          <span className="text-sm text-muted-foreground">OR</span>
           <div className="flex-1 h-px bg-border" />
         </div>
 
@@ -282,7 +299,7 @@ function SearchPatientStep({
           className="w-full h-14 gap-3 bg-gradient-to-r from-teal-600 to-teal-500 text-lg font-semibold hover:from-teal-700 hover:to-teal-600"
         >
           <QrCode className="w-5 h-5" />
-          Scan QR Pasien
+          Scan Patient QR
         </Button>
       </div>
 
@@ -317,18 +334,18 @@ function InputRecordStep({
   // Sample medical history data
   const medicalHistory = [
     {
-      date: "15 Desember 2024",
+      date: "December 15, 2024",
       diagnosis: "Influenza A",
-      symptoms: "Demam tinggi, batuk kering, nyeri otot, sakit kepala",
+      symptoms: "High fever, dry cough, muscle pain, headache",
       treatment: "Paracetamol 500mg 3x1, Oseltamivir 75mg 2x1",
-      hospital: "RS Siloam Jakarta Selatan",
+      hospital: "Siloam Hospital South Jakarta",
     },
     {
-      date: "28 November 2024",
-      diagnosis: "Gastritis Akut",
-      symptoms: "Nyeri ulu hati, mual, kembung",
-      treatment: "Omeprazole 20mg 1x1, Antasida 3x1",
-      hospital: "RS Pondok Indah Bintaro",
+      date: "November 28, 2024",
+      diagnosis: "Acute Gastritis",
+      symptoms: "Epigastric pain, nausea, bloating",
+      treatment: "Omeprazole 20mg 1x1, Antacid 3x1",
+      hospital: "Pondok Indah Hospital Bintaro",
     },
   ];
 
@@ -340,7 +357,7 @@ function InputRecordStep({
         className=" mt-2 flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
-        Kembali
+        Back
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 mt-2 gap-6">
@@ -359,7 +376,7 @@ function InputRecordStep({
             {/* Patient Stats */}
             <div className="grid grid-cols-3 gap-2 mb-6">
               <div className="text-center p-2 bg-white/5 rounded-lg">
-                <p className="text-xs text-white/50">Darah</p>
+                <p className="text-xs text-white/50">Blood</p>
                 <p className="font-bold">{patient.bloodType}</p>
               </div>
               <div className="text-center p-2 bg-white/5 rounded-lg">
@@ -367,9 +384,9 @@ function InputRecordStep({
                 <p className="font-bold">{patient.gender}</p>
               </div>
               <div className="text-center p-2 bg-white/5 rounded-lg">
-                <p className="text-xs text-white/50">Usia</p>
+                <p className="text-xs text-white/50">Age</p>
                 <p className="font-bold">{patient.age}</p>
-                <p className="text-xs text-white/50">Tahun</p>
+                <p className="text-xs text-white/50">Years</p>
               </div>
             </div>
 
@@ -387,9 +404,9 @@ function InputRecordStep({
               <div className="flex items-start gap-3">
                 <Info className="w-10 h-10 text-white/60 mt-2 mb-2"/>
                 <div>
-                  <p className="text-xs text-white/60 mb-1">Info Kunci</p>
+                  <p className="text-xs text-white/60 mb-1">Key Info</p>
                   <p className="text-sm text-white/80">
-                    Sebagai institusi, kunci akses <span className="font-bold">KMS (Key Management System)</span> Rumah Sakit. Anda tidak perlu mengelola kunci pribadi secara manual.
+                    As an institution, the hospital&apos;s <span className="font-bold">KMS (Key Management System)</span> is your access key. You don&apos;t need to manage private keys manually.
                   </p>
                 </div>
               </div>
@@ -411,7 +428,7 @@ function InputRecordStep({
                 }`}
               >
                 <FileText className="w-4 h-4" />
-                Riwayat Medis
+                Medical History
               </button>
               <button
                 onClick={() => setActiveTab("new")}
@@ -422,7 +439,7 @@ function InputRecordStep({
                 }`}
               >
                 <Stethoscope className="w-4 h-4" />
-                Input Baru
+                New Record
               </button>
             </div>
 
@@ -438,17 +455,17 @@ function InputRecordStep({
                           <h4 className="font-semibold text-foreground mt-1">{record.diagnosis}</h4>
                         </div>
                         <span className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-medium">
-                          Selesai
+                          Complete
                         </span>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">Keluhan</p>
+                          <p className="text-xs text-muted-foreground mb-1">Symptoms</p>
                           <p className="text-sm text-foreground">{record.symptoms}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">Tindakan</p>
+                          <p className="text-xs text-muted-foreground mb-1">Treatment</p>
                           <p className="text-sm text-foreground">{record.treatment}</p>
                         </div>
                       </div>
@@ -462,7 +479,7 @@ function InputRecordStep({
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
                     <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>Belum ada riwayat medis</p>
+                    <p>No medical history yet</p>
                   </div>
                 )}
               </div>
@@ -477,24 +494,24 @@ function InputRecordStep({
                 {/* Divider */}
                 <div className="flex items-center gap-4">
                   <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-muted-foreground uppercase">Atau Input Manual</span>
+                  <span className="text-xs text-muted-foreground uppercase">Or Manual Input</span>
                   <div className="flex-1 h-px bg-border" />
                 </div>
 
                 {/* Row 1: No RM & Tanggal */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">NO. REKAM MEDIK</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">MEDICAL RECORD NO.</label>
                     <input
                       type="text"
                       value={medicalRecord.noRekamMedik}
                       onChange={(e) => setMedicalRecord({ ...medicalRecord, noRekamMedik: e.target.value })}
-                      placeholder="RM-2024-00001"
+                      placeholder="MR-2024-00001"
                       className="w-full h-10 px-3 bg-muted/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">TANGGAL MASUK (MRS)</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">ADMISSION DATE (MRS)</label>
                     <input
                       type="date"
                       value={medicalRecord.tanggalMasuk}
@@ -503,7 +520,7 @@ function InputRecordStep({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">TANGGAL KELUAR (KRS)</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">DISCHARGE DATE (KRS)</label>
                     <input
                       type="date"
                       value={medicalRecord.tanggalKeluar}
@@ -516,17 +533,17 @@ function InputRecordStep({
                 {/* Row 2: Diagnosa */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">DIAGNOSA UTAMA *</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">PRIMARY DIAGNOSIS *</label>
                     <input
                       type="text"
                       value={medicalRecord.diagnosisUtama}
                       onChange={(e) => setMedicalRecord({ ...medicalRecord, diagnosisUtama: e.target.value })}
-                      placeholder="Contoh: Bronchitis Akut"
+                      placeholder="e.g. Acute Bronchitis"
                       className="w-full h-10 px-3 bg-muted/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">KODE ICD-X</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">ICD-X CODE</label>
                     <input
                       type="text"
                       value={medicalRecord.icdCode}
@@ -539,12 +556,12 @@ function InputRecordStep({
 
                 {/* Row 3: Diagnosa Sekunder */}
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">DIAGNOSA SEKUNDER / KOMPLIKASI</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">SECONDARY DIAGNOSIS / COMPLICATIONS</label>
                   <input
                     type="text"
                     value={medicalRecord.diagnosisSekunder}
                     onChange={(e) => setMedicalRecord({ ...medicalRecord, diagnosisSekunder: e.target.value })}
-                    placeholder="Jika ada..."
+                    placeholder="If any..."
                     className="w-full h-10 px-3 bg-muted/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                   />
                 </div>
@@ -552,20 +569,20 @@ function InputRecordStep({
                 {/* Row 4: Keluhan & Riwayat Alergi */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">KELUHAN / GEJALA *</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">SYMPTOMS / COMPLAINTS *</label>
                     <textarea
                       value={medicalRecord.keluhan}
                       onChange={(e) => setMedicalRecord({ ...medicalRecord, keluhan: e.target.value })}
-                      placeholder="Detail keluhan pasien..."
+                      placeholder="Detail patient symptoms..."
                       className="w-full h-24 px-3 py-2 bg-muted/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20 resize-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">RIWAYAT ALERGI</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">ALLERGY HISTORY</label>
                     <textarea
                       value={medicalRecord.riwayatAlergi}
                       onChange={(e) => setMedicalRecord({ ...medicalRecord, riwayatAlergi: e.target.value })}
-                      placeholder="Tidak ada / Sebutkan..."
+                      placeholder="None / Specify..."
                       className="w-full h-24 px-3 py-2 bg-muted/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20 resize-none"
                     />
                   </div>
@@ -574,20 +591,20 @@ function InputRecordStep({
                 {/* Row 5: Tindakan & Resep */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">TINDAKAN / OPERASI</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">PROCEDURE / SURGERY</label>
                     <textarea
                       value={medicalRecord.tindakan}
                       onChange={(e) => setMedicalRecord({ ...medicalRecord, tindakan: e.target.value })}
-                      placeholder="Pemeriksaan, prosedur, operasi..."
+                      placeholder="Examination, procedures, surgery..."
                       className="w-full h-24 px-3 py-2 bg-muted/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20 resize-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">RESEP OBAT</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">PRESCRIPTION</label>
                     <textarea
                       value={medicalRecord.resepObat}
                       onChange={(e) => setMedicalRecord({ ...medicalRecord, resepObat: e.target.value })}
-                      placeholder="Obat yang diberikan..."
+                      placeholder="Medications given..."
                       className="w-full h-24 px-3 py-2 bg-muted/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20 resize-none"
                     />
                   </div>
@@ -596,26 +613,26 @@ function InputRecordStep({
                 {/* Row 6: Keadaan Keluar & Dokter */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">KEADAAN KELUAR</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">DISCHARGE STATUS</label>
                     <select
                       value={medicalRecord.keadaanKeluar}
                       onChange={(e) => setMedicalRecord({ ...medicalRecord, keadaanKeluar: e.target.value as MedicalRecordInput["keadaanKeluar"] })}
                       className="w-full h-10 px-3 bg-muted/30 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                     >
-                      <option value="">Pilih...</option>
-                      <option value="sembuh">Sembuh</option>
-                      <option value="membaik">Membaik</option>
-                      <option value="belumSembuh">Belum Sembuh</option>
-                      <option value="meninggal">Meninggal</option>
+                      <option value="">Select...</option>
+                      <option value="sembuh">Cured</option>
+                      <option value="membaik">Improved</option>
+                      <option value="belumSembuh">Not Cured</option>
+                      <option value="meninggal">Deceased</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">DOKTER PENANGGUNG JAWAB *</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">ATTENDING PHYSICIAN *</label>
                     <input
                       type="text"
                       value={medicalRecord.dokterPenanggungJawab}
                       onChange={(e) => setMedicalRecord({ ...medicalRecord, dokterPenanggungJawab: e.target.value })}
-                      placeholder="dr. Nama Lengkap, Sp.X"
+                      placeholder="Dr. Full Name, Sp.X"
                       className="w-full h-10 px-3 bg-muted/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                     />
                   </div>
@@ -669,18 +686,18 @@ function OCRUploadSection({
     
     // Mock OCR result - in production this would call Tesseract.js or an API
     const mockResult: MedicalRecordInput = {
-      noRekamMedik: "RM-2024-00123",
+      noRekamMedik: "MR-2024-00123",
       tanggalMasuk: new Date().toISOString().split('T')[0],
       tanggalKeluar: "",
-      diagnosisUtama: "Bronchitis Akut",
+      diagnosisUtama: "Acute Bronchitis",
       icdCode: "J20.9",
       diagnosisSekunder: "",
-      keluhan: "Batuk berdahak selama 5 hari, demam ringan 37.8°C, sesak napas ringan, nyeri dada saat batuk",
-      riwayatAlergi: "Tidak ada",
-      tindakan: "Pemeriksaan fisik, Rontgen thorax",
-      resepObat: "Ambroxol 30mg 3x1, Salbutamol 2mg 3x1, Paracetamol 500mg 3x1 (jika demam)",
+      keluhan: "Productive cough for 5 days, mild fever 37.8°C, mild shortness of breath, chest pain when coughing",
+      riwayatAlergi: "None",
+      tindakan: "Physical examination, Chest X-ray",
+      resepObat: "Ambroxol 30mg 3x1, Salbutamol 2mg 3x1, Paracetamol 500mg 3x1 (if fever)",
       keadaanKeluar: "",
-      dokterPenanggungJawab: "dr. Ahmad Pratama, Sp.P",
+      dokterPenanggungJawab: "Dr. Ahmad Pratama, Sp.P",
     };
 
     setIsProcessing(false);
@@ -714,9 +731,9 @@ function OCRUploadSection({
           <div className="w-16 h-16 bg-teal-500/10 rounded-2xl flex items-center justify-center mb-4">
             <Upload className="w-8 h-8 text-teal-600" />
           </div>
-          <h4 className="font-semibold text-foreground mb-1">Upload Dokumen Medis</h4>
+          <h4 className="font-semibold text-foreground mb-1">Upload Medical Document</h4>
           <p className="text-sm text-muted-foreground text-center max-w-xs">
-            Upload foto resep, hasil lab, atau dokumen diagnosa untuk auto-fill form
+            Upload prescription photo, lab results, or diagnosis document for auto-fill
           </p>
           <div className="flex items-center gap-2 mt-4 text-xs text-teal-600">
             <Sparkles className="w-3 h-3" />
@@ -736,13 +753,13 @@ function OCRUploadSection({
             {isProcessing && (
               <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
                 <Loader2 className="w-8 h-8 text-teal-400 animate-spin mb-2" />
-                <p className="text-white text-sm">Memproses OCR...</p>
+                <p className="text-white text-sm">Processing OCR...</p>
               </div>
             )}
             {isComplete && (
               <div className="absolute inset-0 bg-emerald-600/80 flex flex-col items-center justify-center">
                 <FileCheck className="w-10 h-10 text-white mb-2" />
-                <p className="text-white font-semibold">Auto-fill Berhasil!</p>
+                <p className="text-white font-semibold">Auto-fill Successful!</p>
               </div>
             )}
           </div>
@@ -755,13 +772,13 @@ function OCRUploadSection({
               onClick={handleReset}
               disabled={isProcessing}
             >
-              Upload Ulang
+              Re-upload
             </Button>
           </div>
 
           {isComplete && (
             <p className="text-xs text-center text-emerald-600">
-              ✓ Data berhasil di-extract. Silakan review dan edit jika perlu.
+              ✓ Data extracted successfully. Please review and edit if needed.
             </p>
           )}
         </div>
@@ -782,10 +799,10 @@ function SuccessStep({ onReset }: { onReset: () => void }) {
 
         {/* Title */}
         <h1 className="text-3xl font-bold text-foreground mb-3">
-          Data Berhasil Disimpan!
+          Data Saved Successfully!
         </h1>
         <p className="text-muted-foreground mb-8">
-          Data telah dienkripsi dan dikirim ke Wallet Pasien. Hak akses penuh kini berada di tangan pasien.
+          Data has been encrypted and sent to the Patient&apos;s Wallet. Full access rights are now in the patient&apos;s hands.
         </p>
 
         {/* Back Button */}
@@ -793,7 +810,7 @@ function SuccessStep({ onReset }: { onReset: () => void }) {
           onClick={onReset}
           className="w-full h-14 gap-2 bg-gradient-to-r from-teal-600 to-teal-500 text-lg font-semibold hover:from-teal-700 hover:to-teal-600"
         >
-          Kembali ke Menu Utama
+          Back to Main Menu
         </Button>
       </div>
     </div>
@@ -837,7 +854,7 @@ function QRScannerModal({
         scanQRCode();
       }
     } catch {
-      setError("Tidak dapat mengakses kamera.");
+      setError("Cannot access camera.");
       setScanning(false);
     }
   };
@@ -922,13 +939,13 @@ function QRScannerModal({
         if (data.type === "medichain_patient") {
           onScanSuccess(data);
         } else {
-          setError("QR Code tidak valid.");
+          setError("Invalid QR Code.");
         }
       } else {
-        setError("Tidak dapat membaca QR Code dari gambar.");
+        setError("Cannot read QR Code from image.");
       }
     } catch {
-      setError("Gagal memproses gambar.");
+      setError("Failed to process image.");
     } finally {
       setProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -948,7 +965,7 @@ function QRScannerModal({
           <div className="w-12 h-12 bg-teal-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
             <QrCode className="w-6 h-6 text-teal-600" />
           </div>
-          <h3 className="text-lg font-bold text-foreground">Scan QR Pasien</h3>
+          <h3 className="text-lg font-bold text-foreground">Scan Patient QR</h3>
         </div>
 
         {scanning ? (
@@ -965,17 +982,17 @@ function QRScannerModal({
                 </div>
               </div>
             </div>
-            <Button variant="outline" className="w-full" onClick={() => setScanning(false)}>Batal</Button>
+            <Button variant="outline" className="w-full" onClick={() => setScanning(false)}>Cancel</Button>
           </>
         ) : (
           <div className="space-y-3">
             <Button className="w-full gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600" onClick={() => setScanning(true)}>
               <Camera className="w-4 h-4" />
-              Scan dengan Kamera
+              Scan with Camera
             </Button>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleGalleryUpload} className="hidden" />
             <Button variant="outline" className="w-full gap-2" onClick={() => fileInputRef.current?.click()} disabled={processing}>
-              {processing ? "Memproses..." : <><ImagePlus className="w-4 h-4" /> Upload dari Gallery</>}
+              {processing ? "Processing..." : <><ImagePlus className="w-4 h-4" /> Upload from Gallery</>}
             </Button>
           </div>
         )}
