@@ -107,6 +107,31 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
     requestAnimationFrame(scan)
   }
 
+  // Preprocess image to improve QR code readability
+  const preprocessImage = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const imageData = ctx.getImageData(0, 0, width, height)
+    const data = imageData.data
+    
+    // Apply grayscale and increase contrast
+    for (let i = 0; i < data.length; i += 4) {
+      // Convert to grayscale
+      const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+      
+      // Increase contrast with threshold
+      const threshold = 128
+      const contrast = 1.5
+      const adjusted = ((gray - threshold) * contrast) + threshold
+      const final = Math.max(0, Math.min(255, adjusted))
+      
+      data[i] = final     // R
+      data[i + 1] = final // G
+      data[i + 2] = final // B
+    }
+    
+    ctx.putImageData(imageData, 0, 0)
+    return ctx.getImageData(0, 0, width, height)
+  }
+
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -123,18 +148,55 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
         image.onerror = reject
       })
 
+      // Upscale small images for better detection
+      const minSize = 400
+      let targetWidth = image.width
+      let targetHeight = image.height
+      
+      if (image.width < minSize || image.height < minSize) {
+        const scale = Math.max(minSize / image.width, minSize / image.height)
+        targetWidth = Math.round(image.width * scale)
+        targetHeight = Math.round(image.height * scale)
+      }
+
       const canvas = document.createElement("canvas")
-      canvas.width = image.width
-      canvas.height = image.height
+      canvas.width = targetWidth
+      canvas.height = targetHeight
       const ctx = canvas.getContext("2d")
       
       if (!ctx) {
         throw new Error("Cannot get canvas context")
       }
 
-      ctx.drawImage(image, 0, 0)
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const code = jsQR(imageData.data, imageData.width, imageData.height)
+      // Use better image smoothing for upscaling
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = "high"
+      ctx.drawImage(image, 0, 0, targetWidth, targetHeight)
+      
+      // Try without preprocessing first
+      let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      let code = jsQR(imageData.data, imageData.width, imageData.height)
+      
+      // If no result, try with preprocessing
+      if (!code) {
+        ctx.drawImage(image, 0, 0, targetWidth, targetHeight)
+        imageData = preprocessImage(ctx, canvas.width, canvas.height)
+        code = jsQR(imageData.data, imageData.width, imageData.height)
+      }
+      
+      // If still no result, try with inverted colors
+      if (!code) {
+        ctx.drawImage(image, 0, 0, targetWidth, targetHeight)
+        imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        for (let i = 0; i < imageData.data.length; i += 4) {
+          imageData.data[i] = 255 - imageData.data[i]
+          imageData.data[i + 1] = 255 - imageData.data[i + 1]
+          imageData.data[i + 2] = 255 - imageData.data[i + 2]
+        }
+        ctx.putImageData(imageData, 0, 0)
+        imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" })
+      }
 
       if (code) {
         const data = JSON.parse(code.data)

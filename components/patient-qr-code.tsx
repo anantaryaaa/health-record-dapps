@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import QRCode from "qrcode"
-import { X, Download, Printer, Sparkles, User, Droplet, Calendar } from "lucide-react"
+import { X, Download, Printer, Sparkles, User, Droplet, Calendar, QrCode, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PatientData } from "@/lib/patientStorage"
 
@@ -14,6 +14,7 @@ interface PatientQRCodeProps {
 
 export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodeProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>("")
+  const [showLargeQR, setShowLargeQR] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   // Encode patient data as JSON string
@@ -47,11 +48,11 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
   useEffect(() => {
     if (isOpen) {
       QRCode.toDataURL(qrData, {
-        width: 140,
-        margin: 1,
+        width: 600,
+        margin: 3,
         color: {
-          dark: "#1D242B",
-          light: "#00000000",
+          dark: "#000000",
+          light: "#FFFFFF",
         },
         errorCorrectionLevel: "H",
       })
@@ -411,6 +412,17 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
         {/* Action Buttons */}
         <div className="flex gap-2 mt-4">
           <Button
+            onClick={() => setShowLargeQR(true)}
+            className="flex-1 gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white font-semibold justify-center"
+            disabled={!qrDataUrl}
+          >
+            <QrCode className="w-4 h-4" />
+            Show QR for Hospital
+          </Button>
+        </div>
+        
+        <div className="flex gap-2 mt-2">
+          <Button
             onClick={handlePrint}
             className="flex-1 gap-2 bg-secondary text-primary hover:bg-secondary/90 font-semibold justify-center"
             disabled={!qrDataUrl}
@@ -429,6 +441,43 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
           Close
         </button>
       </div>
+
+      {/* Large QR Modal for Scanning */}
+      {showLargeQR && (
+        <div className="fixed inset-0 z-[60] bg-white flex flex-col items-center justify-center p-6">
+          <button
+            onClick={() => setShowLargeQR(false)}
+            className="absolute top-4 left-4 flex items-center gap-2 text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Back
+          </button>
+          
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold text-gray-900">Scan This QR Code</h2>
+            <p className="text-gray-600 mt-1">Show this to the hospital staff</p>
+          </div>
+          
+          <div className="bg-white p-4 rounded-2xl shadow-lg border-4 border-teal-500">
+            {qrDataUrl && (
+              <img 
+                src={qrDataUrl} 
+                alt="Patient QR Code" 
+                className="w-[280px] h-[280px] sm:w-[320px] sm:h-[320px]"
+              />
+            )}
+          </div>
+          
+          <div className="mt-6 text-center">
+            <p className="font-semibold text-gray-900">{patientData.name}</p>
+            <p className="font-mono text-sm text-gray-500 mt-1">{shortAddress}</p>
+          </div>
+          
+          <p className="mt-8 text-sm text-gray-400">
+            The hospital will request access after scanning
+          </p>
+        </div>
+      )}
     </div>
   )
 }

@@ -16,11 +16,21 @@ import {
   Camera,
   X,
   Stethoscope,
-  FileText
+  FileText,
+  AlertCircle,
+  Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { isHospitalRegistered, getHospitalData } from "@/lib/hospitalStorage";
+import { 
+  requestPatientAccess, 
+  checkAccess, 
+  hasPatientIdentity,
+  addMedicalRecord,
+  createDataHash 
+} from "@/lib/services/blockchain";
+import { uploadMedicalRecord, type MedicalRecordData } from "@/lib/services/ipfs";
 
 // Types
 interface ScannedPatientData {
@@ -80,6 +90,8 @@ export default function HospitalDashboard() {
   // Search state
   const [nikInput, setNikInput] = useState("");
   const [showScanner, setShowScanner] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   
   // Hospital data
   const hospitalData = account ? getHospitalData(account.address) : null;
@@ -111,10 +123,69 @@ export default function HospitalDashboard() {
     setShowScanner(false);
   };
 
-  const handleSubmitRecord = () => {
-    // TODO: Push to blockchain
-    console.log("Submitting medical record:", { patient, medicalRecord });
-    setCurrentStep("success");
+  const handleSubmitRecord = async () => {
+    if (!patient || !account || !hospitalData) return;
+    
+    setIsSubmitting(true);
+    setSubmitError(null);
+    
+    try {
+      // 1. Prepare medical record data for IPFS
+      const ipfsRecordData: MedicalRecordData = {
+        patientAddress: patient.walletAddress,
+        noRekamMedik: medicalRecord.noRekamMedik,
+        tanggalMasuk: medicalRecord.tanggalMasuk,
+        tanggalKeluar: medicalRecord.tanggalKeluar,
+        diagnosisUtama: medicalRecord.diagnosisUtama,
+        icdCode: medicalRecord.icdCode,
+        diagnosisSekunder: medicalRecord.diagnosisSekunder,
+        keluhan: medicalRecord.keluhan,
+        riwayatAlergi: medicalRecord.riwayatAlergi,
+        tindakan: medicalRecord.tindakan,
+        resepObat: medicalRecord.resepObat,
+        keadaanKeluar: medicalRecord.keadaanKeluar,
+        dokterPenanggungJawab: medicalRecord.dokterPenanggungJawab,
+        hospitalAddress: account.address,
+        hospitalName: hospitalData.name,
+        timestamp: Math.floor(Date.now() / 1000),
+        recordType: "DIAGNOSIS",
+      };
+      
+      // 2. Upload encrypted data to IPFS
+      console.log("Uploading to IPFS...");
+      const ipfsResult = await uploadMedicalRecord(ipfsRecordData);
+      
+      if (!ipfsResult.success || !ipfsResult.cid || !ipfsResult.dataHash) {
+        throw new Error(ipfsResult.error || "Failed to upload to IPFS");
+      }
+      
+      console.log("IPFS upload successful:", ipfsResult.cid);
+      
+      // 3. Store reference on blockchain
+      console.log("Storing reference on blockchain...");
+      const blockchainResult = await addMedicalRecord(
+        account,
+        patient.walletAddress,
+        ipfsResult.cid,
+        ipfsResult.dataHash,
+        medicalRecord.icdCode,
+        "DIAGNOSIS"
+      );
+      
+      if (!blockchainResult.success) {
+        throw new Error(blockchainResult.error || "Failed to store on blockchain");
+      }
+      
+      console.log("Blockchain transaction successful:", blockchainResult.txHash);
+      
+      // Success!
+      setCurrentStep("success");
+    } catch (error) {
+      console.error("Error submitting medical record:", error);
+      setSubmitError(error instanceof Error ? error.message : "Failed to submit record");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {
@@ -181,6 +252,8 @@ export default function HospitalDashboard() {
             setMedicalRecord={setMedicalRecord}
             onSubmit={handleSubmitRecord}
             onBack={() => setCurrentStep("search")}
+            isSubmitting={isSubmitting}
+            submitError={submitError}
           />
         )}
 
@@ -321,12 +394,16 @@ function InputRecordStep({
   setMedicalRecord,
   onSubmit,
   onBack,
+  isSubmitting = false,
+  submitError = null,
 }: {
   patient: ScannedPatientData;
   medicalRecord: MedicalRecordInput;
   setMedicalRecord: (v: MedicalRecordInput) => void;
   onSubmit: () => void;
   onBack: () => void;
+  isSubmitting?: boolean;
+  submitError?: string | null;
 }) {
   const [activeTab, setActiveTab] = useState<"history" | "new">("history");
   const isFormValid = medicalRecord.diagnosisUtama && medicalRecord.keluhan && medicalRecord.dokterPenanggungJawab;
@@ -638,14 +715,31 @@ function InputRecordStep({
                   </div>
                 </div>
 
+                {/* Error Message */}
+                {submitError && (
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-600 mt-4">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <span className="text-sm">{submitError}</span>
+                  </div>
+                )}
+
                 {/* Submit Button */}
                 <Button
                   onClick={onSubmit}
-                  disabled={!isFormValid}
-                  className="w-full h-14 gap-2 bg-emerald-600 hover:bg-emerald-700 text-lg font-semibold mt-4"
+                  disabled={!isFormValid || isSubmitting}
+                  className="w-full h-14 gap-2 bg-emerald-600 hover:bg-emerald-700 text-lg font-semibold mt-4 disabled:opacity-50"
                 >
-                  <CheckCircle2 className="w-5 h-5" />
-                  Push to Blockchain
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Encrypting & Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-5 h-5" />
+                      Push to Blockchain
+                    </>
+                  )}
                 </Button>
               </div>
             )}
@@ -817,7 +911,7 @@ function SuccessStep({ onReset }: { onReset: () => void }) {
   );
 }
 
-// QR Scanner Modal Component
+// QR Scanner Modal Component with Access Request
 function QRScannerModal({
   onClose,
   onScanSuccess,
@@ -825,9 +919,17 @@ function QRScannerModal({
   onClose: () => void;
   onScanSuccess: (data: ScannedPatientData) => void;
 }) {
+  const account = useActiveAccount();
+  const hospitalData = account ? getHospitalData(account.address) : null;
+  
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [scannedPatient, setScannedPatient] = useState<ScannedPatientData | null>(null);
+  const [accessStatus, setAccessStatus] = useState<"none" | "checking" | "has_access" | "requesting" | "requested">("none");
+  const [requestMessage, setRequestMessage] = useState("");
+  const [manualAddress, setManualAddress] = useState("");
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -866,6 +968,57 @@ function QRScannerModal({
     }
   };
 
+  const handlePatientScanned = async (data: ScannedPatientData) => {
+    setScannedPatient(data);
+    setScanning(false);
+    stopCamera();
+    
+    if (!account) return;
+    
+    // Check if we already have access
+    setAccessStatus("checking");
+    try {
+      const accessResult = await checkAccess(data.walletAddress, account.address);
+      if (accessResult.hasAccess) {
+        setAccessStatus("has_access");
+      } else {
+        setAccessStatus("none");
+      }
+    } catch (err) {
+      console.error("Error checking access:", err);
+      setAccessStatus("none");
+    }
+  };
+
+  const handleManualAddressSubmit = async () => {
+    if (!manualAddress || !manualAddress.startsWith("0x") || manualAddress.length !== 42) {
+      setError("Please enter a valid wallet address (0x...)");
+      return;
+    }
+
+    setProcessing(true);
+    setError(null);
+
+    try {
+      // Create minimal patient data for manual entry
+      const manualPatientData: ScannedPatientData = {
+        type: "medichain_patient",
+        walletAddress: manualAddress,
+        name: "Patient",
+        nik: "Manual Entry",
+        bloodType: "-",
+        gender: "-",
+        age: 0,
+      };
+      await handlePatientScanned(manualPatientData);
+    } catch (err) {
+      console.error("Error with manual address:", err);
+      setError("Failed to process wallet address.");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const scanQRCode = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -891,9 +1044,7 @@ function QRScannerModal({
         try {
           const data = JSON.parse(code.data);
           if (data.type === "medichain_patient") {
-            stopCamera();
-            setScanning(false);
-            onScanSuccess(data);
+            handlePatientScanned(data);
             return;
           }
         } catch {
@@ -924,31 +1075,90 @@ function QRScannerModal({
       });
 
       const canvas = document.createElement("canvas");
-      canvas.width = image.width;
-      canvas.height = image.height;
       const ctx = canvas.getContext("2d");
       
       if (!ctx) throw new Error("Cannot get canvas context");
 
-      ctx.drawImage(image, 0, 0);
+      // Scale up small images for better QR detection
+      const minSize = 600;
+      const scale = Math.max(1, minSize / Math.min(image.width, image.height));
+      canvas.width = image.width * scale;
+      canvas.height = image.height * scale;
+      
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      
+      // Apply grayscale and contrast enhancement for better detection
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        // Convert to grayscale
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        // Increase contrast
+        const contrast = ((avg - 128) * 1.5) + 128;
+        const val = Math.max(0, Math.min(255, contrast));
+        data[i] = val;
+        data[i + 1] = val;
+        data[i + 2] = val;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      
+      const processedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(processedImageData.data, processedImageData.width, processedImageData.height, {
+        inversionAttempts: "attemptBoth",
+      });
 
       if (code) {
-        const data = JSON.parse(code.data);
-        if (data.type === "medichain_patient") {
-          onScanSuccess(data);
+        const qrData = JSON.parse(code.data);
+        if (qrData.type === "medichain_patient") {
+          await handlePatientScanned(qrData);
         } else {
           setError("Invalid QR Code.");
         }
       } else {
-        setError("Cannot read QR Code from image.");
+        setError("Cannot read QR Code from image. Try manual entry below.");
       }
-    } catch {
-      setError("Failed to process image.");
+    } catch (err) {
+      console.error("QR processing error:", err);
+      setError("Failed to process image. Try manual entry below.");
     } finally {
       setProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRequestAccess = async () => {
+    if (!account || !scannedPatient || !hospitalData) return;
+    
+    setAccessStatus("requesting");
+    setError(null);
+    
+    try {
+      const result = await requestPatientAccess(
+        account,
+        scannedPatient.walletAddress,
+        hospitalData.name,
+        31536000, // 1 year
+        requestMessage || `Access request for medical treatment at ${hospitalData.name}`
+      );
+      
+      if (result.success) {
+        setAccessStatus("requested");
+      } else {
+        setError(result.error || "Failed to send access request");
+        setAccessStatus("none");
+      }
+    } catch (err) {
+      console.error("Error requesting access:", err);
+      setError("Failed to send access request");
+      setAccessStatus("none");
+    }
+  };
+
+  const handleProceedWithAccess = () => {
+    if (scannedPatient) {
+      onScanSuccess(scannedPatient);
     }
   };
 
@@ -956,43 +1166,183 @@ function QRScannerModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative z-10 w-full max-w-md mx-4 p-6 bg-card border border-border rounded-2xl">
+      <div className="relative z-10 w-full max-w-md mx-4 p-6 bg-card border border-border rounded-2xl max-h-[90vh] overflow-y-auto">
         <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:bg-muted rounded-lg">
           <X className="w-5 h-5 text-muted-foreground" />
         </button>
 
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-teal-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-            <QrCode className="w-6 h-6 text-teal-600" />
-          </div>
-          <h3 className="text-lg font-bold text-foreground">Scan Patient QR</h3>
-        </div>
-
-        {scanning ? (
+        {/* Step 1: Scanning */}
+        {!scannedPatient && (
           <>
-            <div className="relative aspect-square bg-black rounded-xl overflow-hidden mb-4">
-              <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline />
-              <canvas ref={canvasRef} className="hidden" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-48 h-48 border-2 border-teal-500 rounded-2xl">
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-teal-500 rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-teal-500 rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-teal-500 rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-teal-500 rounded-br-lg" />
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-teal-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <QrCode className="w-6 h-6 text-teal-600" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Scan Patient QR</h3>
+            </div>
+
+            {scanning ? (
+              <>
+                <div className="relative aspect-square bg-black rounded-xl overflow-hidden mb-4">
+                  <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline />
+                  <canvas ref={canvasRef} className="hidden" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-48 h-48 border-2 border-teal-500 rounded-2xl">
+                      <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-teal-500 rounded-tl-lg" />
+                      <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-teal-500 rounded-tr-lg" />
+                      <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-teal-500 rounded-bl-lg" />
+                      <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-teal-500 rounded-br-lg" />
+                    </div>
+                  </div>
+                </div>
+                <Button variant="outline" className="w-full" onClick={() => setScanning(false)}>Cancel</Button>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <Button className="w-full gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600" onClick={() => setScanning(true)}>
+                  <Camera className="w-4 h-4" />
+                  Scan with Camera
+                </Button>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleGalleryUpload} className="hidden" />
+                <Button variant="outline" className="w-full gap-2" onClick={() => fileInputRef.current?.click()} disabled={processing}>
+                  {processing ? "Processing..." : <><ImagePlus className="w-4 h-4" /> Upload from Gallery</>}
+                </Button>
+
+                {/* Manual Address Entry */}
+                <div className="pt-4 border-t border-border">
+                  <p className="text-sm text-muted-foreground text-center mb-3">Or enter wallet address manually:</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="0x..."
+                      value={manualAddress}
+                      onChange={(e) => setManualAddress(e.target.value)}
+                      className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground font-mono"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={handleManualAddressSubmit}
+                      disabled={processing || !manualAddress}
+                    >
+                      {processing ? "..." : "Go"}
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-            <Button variant="outline" className="w-full" onClick={() => setScanning(false)}>Cancel</Button>
+            )}
           </>
-        ) : (
-          <div className="space-y-3">
-            <Button className="w-full gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600" onClick={() => setScanning(true)}>
-              <Camera className="w-4 h-4" />
-              Scan with Camera
+        )}
+
+        {/* Step 2: Patient Found - Request Access */}
+        {scannedPatient && accessStatus !== "has_access" && accessStatus !== "requested" && (
+          <>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-teal-600 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-3 text-white text-2xl font-bold">
+                {scannedPatient.name.charAt(0)}
+              </div>
+              <h3 className="text-lg font-bold text-foreground">{scannedPatient.name}</h3>
+              <p className="text-sm text-muted-foreground font-mono">{scannedPatient.nik}</p>
+            </div>
+
+            <div className="flex justify-center gap-3 mb-6">
+              <div className="px-3 py-1.5 bg-muted rounded-lg text-center">
+                <span className="text-xs text-muted-foreground">Blood</span>
+                <p className="font-semibold text-foreground">{scannedPatient.bloodType}</p>
+              </div>
+              <div className="px-3 py-1.5 bg-muted rounded-lg text-center">
+                <span className="text-xs text-muted-foreground">Gender</span>
+                <p className="font-semibold text-foreground">{scannedPatient.gender}</p>
+              </div>
+              <div className="px-3 py-1.5 bg-muted rounded-lg text-center">
+                <span className="text-xs text-muted-foreground">Age</span>
+                <p className="font-semibold text-foreground">{scannedPatient.age}</p>
+              </div>
+            </div>
+
+            {accessStatus === "checking" && (
+              <div className="text-center py-4">
+                <div className="animate-spin w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Checking access permissions...</p>
+              </div>
+            )}
+
+            {accessStatus === "none" && (
+              <div className="space-y-4">
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">Access Required</p>
+                      <p className="text-sm text-muted-foreground">
+                        You need patient approval to view and add medical records.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                    Message (optional)
+                  </label>
+                  <textarea
+                    value={requestMessage}
+                    onChange={(e) => setRequestMessage(e.target.value)}
+                    placeholder="e.g., Routine checkup at outpatient clinic"
+                    className="w-full h-20 px-3 py-2 bg-muted/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/20 resize-none"
+                  />
+                </div>
+
+                <Button 
+                  className="w-full gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600"
+                  onClick={handleRequestAccess}
+                >
+                  <Send className="w-4 h-4" />
+                  Request Access
+                </Button>
+              </div>
+            )}
+
+            {accessStatus === "requesting" && (
+              <div className="text-center py-4">
+                <div className="animate-spin w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Sending access request to blockchain...</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Step 3: Access Request Sent */}
+        {scannedPatient && accessStatus === "requested" && (
+          <div className="text-center">
+            <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-lg font-bold text-foreground mb-2">Request Sent!</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              The patient will receive a notification in their app. Once approved, you can proceed with adding medical records.
+            </p>
+            <Button variant="outline" className="w-full" onClick={onClose}>
+              Close
             </Button>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleGalleryUpload} className="hidden" />
-            <Button variant="outline" className="w-full gap-2" onClick={() => fileInputRef.current?.click()} disabled={processing}>
-              {processing ? "Processing..." : <><ImagePlus className="w-4 h-4" /> Upload from Gallery</>}
+          </div>
+        )}
+
+        {/* Step 3 Alt: Already Has Access */}
+        {scannedPatient && accessStatus === "has_access" && (
+          <div className="text-center">
+            <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ShieldCheck className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-lg font-bold text-foreground mb-2">Access Granted</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              You already have access to this patient&apos;s records. You can proceed with adding medical records.
+            </p>
+            <Button 
+              className="w-full gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600"
+              onClick={handleProceedWithAccess}
+            >
+              <Stethoscope className="w-4 h-4" />
+              Proceed to Medical Record
             </Button>
           </div>
         )}

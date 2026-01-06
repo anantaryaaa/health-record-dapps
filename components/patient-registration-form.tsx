@@ -1,9 +1,11 @@
 "use client"
 
 import * as React from "react"
+import { useState } from "react"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
 import { zodValidator } from "@tanstack/zod-form-adapter"
+import { useActiveAccount } from "thirdweb/react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -23,7 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { savePatientData, PatientData } from "@/lib/patientStorage"
-import { User, CreditCard, Droplets, Users, Calendar } from "lucide-react"
+import { selfRegisterPatient, getExplorerUrl } from "@/lib/services/blockchain"
+import { User, CreditCard, Droplets, Users, Calendar, Loader2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react"
 
 // Define Schema
 const patientSchema = z.object({
@@ -43,6 +46,11 @@ interface PatientRegistrationFormProps {
 }
 
 export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRegistrationFormProps) {
+  const account = useActiveAccount()
+  const [isMinting, setIsMinting] = useState(false)
+  const [mintError, setMintError] = useState<string | null>(null)
+  const [txHash, setTxHash] = useState<string | null>(null)
+  
   const form = useForm({
     defaultValues: {
       name: "",
@@ -55,19 +63,49 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
       onChange: patientSchema as any,
     },
     onSubmit: async ({ value }) => {
-      const newData: PatientData = {
-        name: value.name,
-        nik: value.nik,
-        bloodType: value.bloodType as any,
-        gender: value.gender as any,
-        age: Number(value.age),
-        walletAddress: walletAddress,
-        linkedAddresses: [], // Initialize empty linked addresses
-        registeredAt: new Date().toISOString(),
+      if (!account) {
+        setMintError("Wallet not connected")
+        return
       }
       
-      savePatientData(newData)
-      onComplete(newData)
+      setIsMinting(true)
+      setMintError(null)
+      setTxHash(null)
+      
+      try {
+        // 1. Mint NFT Identity on blockchain
+        console.log("Minting patient identity NFT...")
+        const mintResult = await selfRegisterPatient(account)
+        
+        if (!mintResult.success) {
+          throw new Error(mintResult.error || "Failed to mint identity NFT")
+        }
+        
+        console.log("NFT minted successfully:", mintResult.txHash)
+        setTxHash(mintResult.txHash || null)
+        
+        // 2. Save to localStorage as cache
+        const newData: PatientData = {
+          name: value.name,
+          nik: value.nik,
+          bloodType: value.bloodType as any,
+          gender: value.gender as any,
+          age: Number(value.age),
+          walletAddress: walletAddress,
+          linkedAddresses: [],
+          registeredAt: new Date().toISOString(),
+        }
+        
+        savePatientData(newData)
+        
+        // 3. Complete registration
+        onComplete(newData)
+      } catch (error) {
+        console.error("Registration error:", error)
+        setMintError(error instanceof Error ? error.message : "Failed to register on blockchain")
+      } finally {
+        setIsMinting(false)
+      }
     },
   })
 
@@ -250,22 +288,66 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
           />
 
         </form>
+        
+        {/* Error Message */}
+        {mintError && (
+          <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-destructive">Registration Failed</p>
+              <p className="text-sm text-destructive/80">{mintError}</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Success Message with TX Hash */}
+        {txHash && (
+          <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-emerald-600">Identity NFT Minted!</p>
+              <a 
+                href={getExplorerUrl(txHash)} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-sm text-emerald-600/80 hover:underline flex items-center gap-1"
+              >
+                View on Explorer <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        )}
       </CardContent>
       
-      <CardFooter className="flex justify-center border-t border-border/50 pt-6">
+      <CardFooter className="flex flex-col gap-4 border-t border-border/50 pt-6">
         <form.Subscribe
           selector={(state) => [state.canSubmit, state.isSubmitting]}
           children={([canSubmit, isSubmitting]) => (
             <Button 
                type="submit" 
                form="patient-registration-form"
-               disabled={!canSubmit}
-               className="bg-primary hover:bg-primary/90 min-w-[140px] justify-center"
+               disabled={!canSubmit || isMinting || !account}
+               className="w-full bg-gradient-to-r from-primary to-primary/80 hover:opacity-90 min-w-[200px] h-12 text-base font-semibold"
             >
-              {isSubmitting ? "Processing..." : "Submit Registration"}
+              {isMinting ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Minting Identity NFT...
+                </>
+              ) : isSubmitting ? (
+                "Processing..."
+              ) : (
+                <>
+                  <CheckCircle2 className="w-5 h-5 mr-2" />
+                  Register & Mint Identity NFT
+                </>
+              )}
             </Button>
           )}
         />
+        <p className="text-xs text-muted-foreground text-center">
+          This will create a Soulbound NFT (non-transferable) as your identity on the blockchain.
+        </p>
       </CardFooter>
     </Card>
   )

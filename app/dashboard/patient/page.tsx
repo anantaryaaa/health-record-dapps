@@ -8,6 +8,7 @@ import { PatientRegistrationForm } from "@/components/patient-registration-form"
 import { PatientQRCode } from "@/components/patient-qr-code"
 import { PatientProfileSection } from "@/components/patient-profile-section"
 import { MedicalHistorySection } from "@/components/medical-history-section"
+import { PendingAccessRequests } from "@/components/pending-access-requests"
 import { getPatientData, PatientData, getBiometricEnabled, setBiometricEnabled as saveBiometricEnabled, linkWalletToPatient } from "@/lib/patientStorage"
 import { useBiometricAuth } from "@/hooks/use-biometric-auth"
 import { User, Loader2 } from "lucide-react"
@@ -191,13 +192,20 @@ export default function PatientDashboard() {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {activeTab === "profile" ? (
-          <PatientProfileSection
-            patientData={patientData}
-            biometricEnabled={biometricEnabled}
-            onBiometricToggle={handleBiometricToggle}
-            onShowPatientCard={() => setShowQR(true)}
-            onEditProfile={() => router.push("/dashboard/patient/settings")}
-          />
+          <>
+            <PatientProfileSection
+              patientData={patientData}
+              biometricEnabled={biometricEnabled}
+              onBiometricToggle={handleBiometricToggle}
+              onShowPatientCard={() => setShowQR(true)}
+              onEditProfile={() => router.push("/dashboard/patient/settings")}
+            />
+            {/* Pending Access Requests Section */}
+            <PendingAccessRequests
+              account={account}
+              patientAddress={account.address}
+            />
+          </>
         ) : (
           <MedicalHistorySection patientData={patientData} />
         )}
