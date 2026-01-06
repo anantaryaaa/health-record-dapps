@@ -28,9 +28,10 @@ import {
   checkAccess, 
   hasPatientIdentity,
   addMedicalRecord,
-  createDataHash 
+  createDataHash,
+  getPatientRecords
 } from "@/lib/services/blockchain";
-import { uploadMedicalRecord, type MedicalRecordData } from "@/lib/services/ipfs";
+import { uploadMedicalRecord, getMedicalRecord, type MedicalRecordData } from "@/lib/services/ipfs";
 
 // Types
 interface ScannedPatientData {
@@ -406,25 +407,86 @@ function InputRecordStep({
   submitError?: string | null;
 }) {
   const [activeTab, setActiveTab] = useState<"history" | "new">("history");
+  const [medicalHistory, setMedicalHistory] = useState<Array<{
+    date: string;
+    diagnosis: string;
+    symptoms: string;
+    treatment: string;
+    hospital: string;
+    icdCode: string;
+    isVerified: boolean;
+  }>>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  
   const isFormValid = medicalRecord.diagnosisUtama && medicalRecord.keluhan && medicalRecord.dokterPenanggungJawab;
 
-  // Sample medical history data
-  const medicalHistory = [
-    {
-      date: "December 15, 2024",
-      diagnosis: "Influenza A",
-      symptoms: "High fever, dry cough, muscle pain, headache",
-      treatment: "Paracetamol 500mg 3x1, Oseltamivir 75mg 2x1",
-      hospital: "Siloam Hospital South Jakarta",
-    },
-    {
-      date: "November 28, 2024",
-      diagnosis: "Acute Gastritis",
-      symptoms: "Epigastric pain, nausea, bloating",
-      treatment: "Omeprazole 20mg 1x1, Antacid 3x1",
-      hospital: "Pondok Indah Hospital Bintaro",
-    },
-  ];
+  // Fetch medical history from blockchain + IPFS
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!patient.walletAddress) return;
+      
+      setIsLoadingHistory(true);
+      setHistoryError(null);
+      
+      try {
+        // Get records from blockchain
+        const recordRefs = await getPatientRecords(patient.walletAddress);
+        
+        if (recordRefs.length === 0) {
+          setMedicalHistory([]);
+          setIsLoadingHistory(false);
+          return;
+        }
+        
+        // Fetch and decrypt each record from IPFS
+        const history: typeof medicalHistory = [];
+        
+        for (const ref of recordRefs) {
+          try {
+            const ipfsResult = await getMedicalRecord(ref.ipfsCid, patient.walletAddress);
+            
+            if (ipfsResult.success && ipfsResult.data) {
+              history.push({
+                date: ipfsResult.data.tanggalMasuk || new Date(ref.timestamp * 1000).toLocaleDateString(),
+                diagnosis: ipfsResult.data.diagnosisUtama || ref.icd10Code,
+                symptoms: ipfsResult.data.keluhan || "",
+                treatment: ipfsResult.data.resepObat || "",
+                hospital: ipfsResult.data.hospitalName || `Hospital ${ref.hospitalAddress.slice(0, 8)}...`,
+                icdCode: ref.icd10Code,
+                isVerified: ref.isVerified,
+              });
+            } else {
+              // Fallback with blockchain data only
+              history.push({
+                date: new Date(ref.timestamp * 1000).toLocaleDateString(),
+                diagnosis: ref.icd10Code,
+                symptoms: "(Encrypted)",
+                treatment: "(Encrypted)",
+                hospital: `Hospital ${ref.hospitalAddress.slice(0, 8)}...`,
+                icdCode: ref.icd10Code,
+                isVerified: ref.isVerified,
+              });
+            }
+          } catch (err) {
+            console.error("Failed to decrypt record:", err);
+          }
+        }
+        
+        // Sort by date descending
+        history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        setMedicalHistory(history);
+      } catch (err) {
+        console.error("Error fetching medical history:", err);
+        setHistoryError("Failed to load medical history");
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+    
+    fetchHistory();
+  }, [patient.walletAddress]);
 
   return (
     <div className="py-6">
@@ -523,17 +585,41 @@ function InputRecordStep({
             {activeTab === "history" ? (
               /* Medical History */
               <div className="space-y-4">
-                {medicalHistory.length > 0 ? (
+                {isLoadingHistory ? (
+                  <div className="text-center py-12">
+                    <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    <p className="text-muted-foreground">Loading medical history from blockchain...</p>
+                  </div>
+                ) : historyError ? (
+                  <div className="text-center py-12 text-red-500">
+                    <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>{historyError}</p>
+                  </div>
+                ) : medicalHistory.length > 0 ? (
                   medicalHistory.map((record, index) => (
                     <div key={index} className="p-4 bg-muted/30 border border-border rounded-xl">
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <span className="text-xs text-muted-foreground">{record.date}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{record.date}</span>
+                            {record.icdCode && (
+                              <span className="text-xs px-1.5 py-0.5 bg-blue-500/10 text-blue-600 rounded font-mono">
+                                {record.icdCode}
+                              </span>
+                            )}
+                          </div>
                           <h4 className="font-semibold text-foreground mt-1">{record.diagnosis}</h4>
                         </div>
-                        <span className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-medium">
-                          Complete
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {record.isVerified && (
+                            <span title="Verified on blockchain" className="text-emerald-500">
+                              <ShieldCheck className="w-4 h-4" />
+                            </span>
+                          )}
+                          <span className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-medium">
+                            Complete
+                          </span>
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">

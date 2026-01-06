@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PatientData } from "@/lib/patientStorage"
+import { getPatientRecords, MedicalRecordRef } from "@/lib/services/blockchain"
+import { getMedicalRecord, MedicalRecordData } from "@/lib/services/ipfs"
 import { 
   FileText,
   Search,
@@ -14,12 +16,17 @@ import {
   Stethoscope,
   FlaskConical,
   Printer,
-  User
+  User,
+  Loader2,
+  RefreshCw,
+  AlertCircle,
+  ShieldCheck
 } from "lucide-react"
 
 // Medical record type - matching rekam medis format
 export interface MedicalRecord {
   id: number
+  ipfsCid: string
   noRekamMedik: string
   tanggalMasuk: string
   tanggalKeluar: string
@@ -33,97 +40,11 @@ export interface MedicalRecord {
   keadaanKeluar: string
   dokterPenanggungJawab: string
   hospital: string
+  hospitalAddress: string
   category: "Diagnose" | "Lab"
+  timestamp: number
+  isVerified: boolean
 }
-
-// Mock data for medical records
-export const medicalRecords: MedicalRecord[] = [
-  {
-    id: 1,
-    noRekamMedik: "MR-2024-00145",
-    tanggalMasuk: "December 15, 2024",
-    tanggalKeluar: "December 15, 2024",
-    diagnosisUtama: "Influenza A",
-    icdCode: "J10.1",
-    diagnosisSekunder: "",
-    keluhan: "High fever, dry cough, muscle pain, headache, fatigue",
-    riwayatAlergi: "None",
-    tindakan: "Physical examination, temperature check",
-    resepObat: "Paracetamol 500mg 3x1, Oseltamivir 75mg 2x1, Complete rest for 5 days",
-    keadaanKeluar: "Improved",
-    dokterPenanggungJawab: "dr. Sarah Wijaya, Sp.PD",
-    hospital: "Siloam Hospital South Jakarta",
-    category: "Diagnose"
-  },
-  {
-    id: 2,
-    noRekamMedik: "MR-2024-00098",
-    tanggalMasuk: "November 28, 2024",
-    tanggalKeluar: "November 28, 2024",
-    diagnosisUtama: "Acute Gastritis",
-    icdCode: "K29.0",
-    diagnosisSekunder: "",
-    keluhan: "Epigastric pain, nausea, bloating, loss of appetite",
-    riwayatAlergi: "None",
-    tindakan: "Endoscopy",
-    resepObat: "Omeprazole 20mg 1x1, Antacid 3x1, Avoid spicy & acidic foods",
-    keadaanKeluar: "Improved",
-    dokterPenanggungJawab: "dr. Budi Santoso, Sp.PD-KGEH",
-    hospital: "Pondok Indah Hospital Bintaro",
-    category: "Diagnose"
-  },
-  {
-    id: 3,
-    noRekamMedik: "MR-2024-00075",
-    tanggalMasuk: "October 5, 2024",
-    tanggalKeluar: "October 5, 2024",
-    diagnosisUtama: "Tension Headache",
-    icdCode: "G44.2",
-    diagnosisSekunder: "",
-    keluhan: "Tension headache, stiff neck, eye fatigue, difficulty concentrating",
-    riwayatAlergi: "Ibuprofen allergy",
-    tindakan: "Head CT Scan",
-    resepObat: "Paracetamol 500mg as needed, Myonal 50mg 2x1, Neck physiotherapy",
-    keadaanKeluar: "Improved",
-    dokterPenanggungJawab: "dr. Linda Kusuma, Sp.S",
-    hospital: "Medika Clinic Surabaya",
-    category: "Diagnose"
-  },
-  {
-    id: 4,
-    noRekamMedik: "MR-2024-00142",
-    tanggalMasuk: "December 10, 2024",
-    tanggalKeluar: "December 10, 2024",
-    diagnosisUtama: "Complete Blood Count (CBC)",
-    icdCode: "Z01.7",
-    diagnosisSekunder: "",
-    keluhan: "Routine checkup",
-    riwayatAlergi: "None",
-    tindakan: "Blood sample collection",
-    resepObat: "Hemoglobin: 14.5 g/dL, Leukocytes: 7,200/µL, Platelets: 250,000/µL",
-    keadaanKeluar: "Complete",
-    dokterPenanggungJawab: "dr. Andi Pratama",
-    hospital: "Prodia Lab Jakarta",
-    category: "Lab"
-  },
-  {
-    id: 5,
-    noRekamMedik: "MR-2024-00056",
-    tanggalMasuk: "November 1, 2024",
-    tanggalKeluar: "November 1, 2024",
-    diagnosisUtama: "Lipid Profile",
-    icdCode: "Z13.6",
-    diagnosisSekunder: "",
-    keluhan: "Cholesterol check",
-    riwayatAlergi: "None",
-    tindakan: "Fasting blood sample collection",
-    resepObat: "Total Cholesterol: 195 mg/dL, HDL: 55 mg/dL, LDL: 120 mg/dL, Triglycerides: 100 mg/dL",
-    keadaanKeluar: "Complete",
-    dokterPenanggungJawab: "dr. Andi Pratama",
-    hospital: "Prodia Lab Jakarta",
-    category: "Lab"
-  }
-]
 
 const categories = ["All", "Diagnose", "Lab"]
 
@@ -135,6 +56,104 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null)
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Fetch records from blockchain and IPFS
+  const fetchRecords = async () => {
+    if (!patientData.walletAddress) return
+    
+    setIsRefreshing(true)
+    setError(null)
+    
+    try {
+      // Get record references from blockchain
+      const recordRefs = await getPatientRecords(patientData.walletAddress)
+      
+      if (recordRefs.length === 0) {
+        setMedicalRecords([])
+        setIsLoading(false)
+        setIsRefreshing(false)
+        return
+      }
+      
+      // Fetch and decrypt each record from IPFS
+      const records: MedicalRecord[] = []
+      
+      for (let i = 0; i < recordRefs.length; i++) {
+        const ref = recordRefs[i]
+        
+        try {
+          const ipfsResult = await getMedicalRecord(ref.ipfsCid, patientData.walletAddress)
+          
+          if (ipfsResult.success && ipfsResult.data) {
+            records.push({
+              id: i + 1,
+              ipfsCid: ref.ipfsCid,
+              noRekamMedik: ipfsResult.data.noRekamMedik || `MR-${ref.timestamp}`,
+              tanggalMasuk: ipfsResult.data.tanggalMasuk || new Date(ref.timestamp * 1000).toLocaleDateString(),
+              tanggalKeluar: ipfsResult.data.tanggalKeluar || "",
+              diagnosisUtama: ipfsResult.data.diagnosisUtama || ref.icd10Code,
+              icdCode: ipfsResult.data.icdCode || ref.icd10Code,
+              diagnosisSekunder: ipfsResult.data.diagnosisSekunder || "",
+              keluhan: ipfsResult.data.keluhan || "",
+              riwayatAlergi: ipfsResult.data.riwayatAlergi || "",
+              tindakan: ipfsResult.data.tindakan || "",
+              resepObat: ipfsResult.data.resepObat || "",
+              keadaanKeluar: ipfsResult.data.keadaanKeluar || "",
+              dokterPenanggungJawab: ipfsResult.data.dokterPenanggungJawab || "",
+              hospital: ipfsResult.data.hospitalName || `Hospital ${ref.hospitalAddress.slice(0, 8)}`,
+              hospitalAddress: ref.hospitalAddress,
+              category: ref.recordType === "Lab" ? "Lab" : "Diagnose",
+              timestamp: ref.timestamp,
+              isVerified: ref.isVerified,
+            })
+          }
+        } catch (ipfsError) {
+          console.error(`Failed to fetch record ${ref.ipfsCid}:`, ipfsError)
+          // Add record with minimal info from blockchain
+          records.push({
+            id: i + 1,
+            ipfsCid: ref.ipfsCid,
+            noRekamMedik: `MR-${ref.timestamp}`,
+            tanggalMasuk: new Date(ref.timestamp * 1000).toLocaleDateString(),
+            tanggalKeluar: "",
+            diagnosisUtama: ref.icd10Code,
+            icdCode: ref.icd10Code,
+            diagnosisSekunder: "",
+            keluhan: "(Unable to decrypt)",
+            riwayatAlergi: "",
+            tindakan: "",
+            resepObat: "",
+            keadaanKeluar: "",
+            dokterPenanggungJawab: "",
+            hospital: `Hospital ${ref.hospitalAddress.slice(0, 8)}...`,
+            hospitalAddress: ref.hospitalAddress,
+            category: ref.recordType === "Lab" ? "Lab" : "Diagnose",
+            timestamp: ref.timestamp,
+            isVerified: ref.isVerified,
+          })
+        }
+      }
+      
+      // Sort by timestamp descending (newest first)
+      records.sort((a, b) => b.timestamp - a.timestamp)
+      
+      setMedicalRecords(records)
+    } catch (err) {
+      console.error("Error fetching records:", err)
+      setError("Failed to fetch medical records from blockchain")
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchRecords()
+  }, [patientData.walletAddress])
 
   // Filter medical records
   const filteredRecords = medicalRecords.filter(record => {
@@ -426,88 +445,146 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
 
   return (
     <div className="space-y-6">
-      {/* Search and Filter Section */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search records..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-card border-border"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Category Filter */}
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap flex-shrink-0 ${
-                  selectedCategory === category
-                    ? "bg-primary text-primary-foreground shadow-md"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                {category === "Diagnose" && <Stethoscope className="w-3 h-3 sm:w-4 sm:h-4" />}
-                {category === "Lab" && <FlaskConical className="w-3 h-3 sm:w-4 sm:h-4" />}
-                <span className="hidden sm:inline">{category}</span>
-                <span className="sm:hidden">{category === "All" ? "All" : category}</span>
-              </button>
-            ))}
-          </div>
+      {/* Header with Refresh Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">Medical History</h2>
+          <p className="text-sm text-muted-foreground">Records from blockchain & IPFS</p>
         </div>
-
-        {/* Results Count */}
-        <p className="text-sm text-muted-foreground">
-          Showing <span className="font-semibold text-foreground">{filteredRecords.length}</span> record{filteredRecords.length !== 1 ? 's' : ''}
-          {searchQuery && <span> for &quot;{searchQuery}&quot;</span>}
-        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={fetchRecords}
+          disabled={isRefreshing}
+          className="gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
-      {/* Medical Records Cards Grid */}
-      {filteredRecords.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {filteredRecords.map((record) => (
-            <Card 
-              key={record.id} 
-              className="group hover:shadow-lg hover:border-primary/30 transition-all duration-300 cursor-pointer overflow-hidden active:scale-[0.98]"
-              onClick={() => setSelectedRecord(record)}
-            >
-              <CardContent className="p-0">
-                {/* Card Header with Category Color */}
-                <div className={`h-1.5 sm:h-2 ${
-                  record.category === "Diagnose" ? "bg-blue-500" : "bg-emerald-500"
-                }`} />
-                
-                <div className="p-4 sm:p-5">
-                  {/* Date and No RM */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Calendar className="w-3 h-3" />
-                      {record.tanggalMasuk}
-                    </div>
-                    <span className="text-xs font-mono text-muted-foreground">
-                      {record.noRekamMedik}
-                    </span>
-                  </div>
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground">Loading records from blockchain...</p>
+        </div>
+      )}
 
-                  {/* Title */}
-                  <h4 className="font-bold text-lg text-foreground mb-2 group-hover:text-primary transition-colors">
-                    {record.diagnosisUtama}
-                  </h4>
+      {/* Error State */}
+      {error && !isLoading && (
+        <div className="flex flex-col items-center justify-center py-16">
+          <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+          <p className="text-red-500 font-medium mb-2">{error}</p>
+          <Button variant="outline" onClick={fetchRecords}>
+            Try Again
+          </Button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !error && medicalRecords.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16">
+          <FileText className="w-12 h-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">No Medical Records</h3>
+          <p className="text-muted-foreground text-center max-w-sm">
+            Your medical records will appear here once healthcare providers add them to the blockchain.
+          </p>
+        </div>
+      )}
+
+      {/* Content when loaded */}
+      {!isLoading && !error && medicalRecords.length > 0 && (
+        <>
+          {/* Search and Filter Section */}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Search Input */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search records..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-card border-border"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap flex-shrink-0 ${
+                      selectedCategory === category
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    {category === "Diagnose" && <Stethoscope className="w-3 h-3 sm:w-4 sm:h-4" />}
+                    {category === "Lab" && <FlaskConical className="w-3 h-3 sm:w-4 sm:h-4" />}
+                    <span className="hidden sm:inline">{category}</span>
+                    <span className="sm:hidden">{category === "All" ? "All" : category}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Results Count */}
+            <p className="text-sm text-muted-foreground">
+              Showing <span className="font-semibold text-foreground">{filteredRecords.length}</span> record{filteredRecords.length !== 1 ? 's' : ''}
+              {searchQuery && <span> for &quot;{searchQuery}&quot;</span>}
+            </p>
+          </div>
+
+          {/* Medical Records Cards Grid */}
+          {filteredRecords.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {filteredRecords.map((record) => (
+                <Card 
+                  key={record.id} 
+                  className="group hover:shadow-lg hover:border-primary/30 transition-all duration-300 cursor-pointer overflow-hidden active:scale-[0.98]"
+                  onClick={() => setSelectedRecord(record)}
+                >
+                  <CardContent className="p-0">
+                    {/* Card Header with Category Color */}
+                    <div className={`h-1.5 sm:h-2 ${
+                      record.category === "Diagnose" ? "bg-blue-500" : "bg-emerald-500"
+                    }`} />
+                    
+                    <div className="p-4 sm:p-5">
+                      {/* Date, No RM, and Verification */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Calendar className="w-3 h-3" />
+                          {record.tanggalMasuk}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {record.isVerified && (
+                            <span title="Verified on blockchain">
+                              <ShieldCheck className="w-3.5 h-3.5 text-green-500" />
+                            </span>
+                          )}
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {record.noRekamMedik}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Title */}
+                      <h4 className="font-bold text-lg text-foreground mb-2 group-hover:text-primary transition-colors">
+                        {record.diagnosisUtama}
+                      </h4>
 
                   {/* Category Badge & Status */}
                   <div className="flex items-center gap-2 mb-3">
@@ -682,6 +759,8 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
             </CardContent>
           </Card>
         </div>
+      )}
+        </>
       )}
     </div>
   )
