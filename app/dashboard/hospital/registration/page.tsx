@@ -15,7 +15,9 @@ import {
   MapPin,
   FileText,
   Mail,
-  Briefcase
+  Briefcase,
+  Loader2,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,12 +49,48 @@ interface FormData {
   picEmail: string;
 }
 
+// Whitelist hospital on blockchain
+async function whitelistHospitalOnChain(hospitalAddress: string, hospitalName: string): Promise<{ success: boolean; txHash?: string; error?: string }> {
+  try {
+    const response = await fetch("/api/hospital/whitelist", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        hospitalAddress,
+        hospitalName,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to whitelist hospital");
+    }
+
+    return {
+      success: true,
+      txHash: data.txHash,
+    };
+  } catch (error) {
+    console.error("Whitelist error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 export default function HospitalRegistration() {
   const account = useActiveAccount();
   const router = useRouter();
   
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
     name: "",
     type: "",
@@ -98,31 +136,56 @@ export default function HospitalRegistration() {
     }
   };
 
-  const handleSubmit = () => {
-    if (!isStep2Valid || !formData.type) return;
+  const handleSubmit = async () => {
+    if (!isStep2Valid || !formData.type || isSubmitting) return;
 
-    const hospitalData: HospitalData = {
-      name: formData.name,
-      type: formData.type as HospitalData["type"],
-      licenseNumber: formData.licenseNumber,
-      address: formData.address,
-      city: formData.city,
-      phone: formData.phone,
-      picName: formData.picName,
-      picPosition: formData.picPosition,
-      picPhone: formData.picPhone,
-      picEmail: formData.picEmail,
-      walletAddress: account.address,
-      registeredAt: new Date().toISOString(),
-    };
+    setIsSubmitting(true);
+    setSubmitError(null);
 
-    saveHospitalData(hospitalData);
-    setShowSuccess(true);
+    try {
+      // Step 1: Whitelist hospital on blockchain
+      const whitelistResult = await whitelistHospitalOnChain(
+        account.address,
+        formData.name
+      );
 
-    // Redirect after showing success
-    setTimeout(() => {
-      router.push("/dashboard/hospital");
-    }, 2000);
+      if (!whitelistResult.success) {
+        throw new Error(whitelistResult.error || "Failed to register on blockchain");
+      }
+
+      if (whitelistResult.txHash) {
+        setTxHash(whitelistResult.txHash);
+      }
+
+      // Step 2: Save to localStorage
+      const hospitalData: HospitalData = {
+        name: formData.name,
+        type: formData.type as HospitalData["type"],
+        licenseNumber: formData.licenseNumber,
+        address: formData.address,
+        city: formData.city,
+        phone: formData.phone,
+        picName: formData.picName,
+        picPosition: formData.picPosition,
+        picPhone: formData.picPhone,
+        picEmail: formData.picEmail,
+        walletAddress: account.address,
+        registeredAt: new Date().toISOString(),
+      };
+
+      saveHospitalData(hospitalData);
+      setShowSuccess(true);
+
+      // Redirect after showing success
+      setTimeout(() => {
+        router.push("/dashboard/hospital");
+      }, 3000);
+    } catch (error) {
+      console.error("Registration error:", error);
+      setSubmitError(error instanceof Error ? error.message : "Registration failed");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const updateField = (field: keyof FormData, value: string) => {
@@ -141,8 +204,22 @@ export default function HospitalRegistration() {
             <h1 className="text-2xl font-bold text-foreground mb-3">
               Registration Successful!
             </h1>
-            <p className="text-muted-foreground">
-              Your hospital profile has been saved. Redirecting to dashboard...
+            <p className="text-muted-foreground mb-4">
+              Your hospital has been registered on the blockchain and whitelisted for patient access.
+            </p>
+            {txHash && (
+              <a
+                href={`https://sepolia-blockscout.lisk.com/tx/${txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 text-sm font-medium"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View on Block Explorer
+              </a>
+            )}
+            <p className="text-muted-foreground text-sm mt-4">
+              Redirecting to dashboard...
             </p>
           </CardContent>
         </Card>
@@ -380,23 +457,40 @@ export default function HospitalRegistration() {
                   </div>
                 </div>
 
+                {/* Error Message */}
+                {submitError && (
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm">
+                    {submitError}
+                  </div>
+                )}
+
                 {/* Buttons */}
                 <div className="flex gap-3 mt-6">
                   <Button
                     variant="outline"
                     onClick={handleBack}
                     className="flex-1 h-12 gap-2"
+                    disabled={isSubmitting}
                   >
                     <ArrowLeft className="w-4 h-4" />
                     Back
                   </Button>
                   <Button
                     onClick={handleSubmit}
-                    disabled={!isStep2Valid}
+                    disabled={!isStep2Valid || isSubmitting}
                     className="flex-1 h-12 gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-base font-semibold"
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    Complete Registration
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Registering on Blockchain...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        Complete Registration
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
