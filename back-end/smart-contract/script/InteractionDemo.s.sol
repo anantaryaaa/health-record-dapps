@@ -21,19 +21,22 @@ contract InteractionDemo is Script {
     
     // Actors
     address public admin;      // PRIVATE_KEY - Admin/Hospital
-    address public patient;    // PRIVATE_KEY2 - Patient
+    address public patient;    // PRIVATE_KEY3 - Patient (fresh wallet)
     
     uint256 adminKey;
     uint256 patientKey;
 
     function setUp() public {
-        // Load contract addresses
-        patientContract = MedichainPatientIdentity(0xd694475B5c7D2610dfcBc9F3ea83377A3ac4C5BB);
-        hospitalRegistry = AutomatedHospitalRegistry(0x7568f9E2D79eB7fE4396BC78fbB63303d984901A);
+        // Load contract addresses from env or use defaults
+        address patientAddr = vm.envOr("PATIENT_IDENTITY_ADDRESS", address(0xD61E5E3a3ac3EeA56466462dBd0121C5e29aaeb7));
+        address hospitalAddr = vm.envOr("HOSPITAL_REGISTRY_ADDRESS", address(0x008e441348Cc791e440874F59dC62A2292222583));
         
-        // Load private keys
+        patientContract = MedichainPatientIdentity(patientAddr);
+        hospitalRegistry = AutomatedHospitalRegistry(hospitalAddr);
+        
+        // Load private keys - using PRIVATE_KEY3 for fresh patient
         adminKey = vm.envUint("PRIVATE_KEY");
-        patientKey = vm.envUint("PRIVATE_KEY2");
+        patientKey = vm.envUint("PRIVATE_KEY3");
         
         admin = vm.addr(adminKey);
         patient = vm.addr(patientKey);
@@ -77,7 +80,7 @@ contract InteractionDemo is Script {
         // Check if already whitelisted
         bool isWhitelisted = patientContract.isHospitalAuthorized(admin);
         if (!isWhitelisted) {
-            patientContract.whitelistHospital(admin);
+            patientContract.whitelistHospital(admin, "RS Medichain Central");
             console.log("  -> RS berhasil di-whitelist!");
         } else {
             console.log("  -> RS sudah ter-whitelist sebelumnya");
@@ -115,10 +118,9 @@ contract InteractionDemo is Script {
         // Check if patient already registered
         bool isRegistered = false;
         try patientContract.getPatientProfile(patient) returns (
-            string memory, string memory, string memory, string memory,
-            uint256, uint256, bool _isActive
+            MedichainPatientIdentity.PatientProfile memory profile
         ) {
-            isRegistered = _isActive;
+            isRegistered = profile.isRegistered;
         } catch {}
         
         if (!isRegistered) {
@@ -130,36 +132,28 @@ contract InteractionDemo is Script {
             console.log("");
             console.log("[STEP 2] Mencetak NFT Identitas (Soulbound Token)...");
             
-            // Register patient - mints SBT
-            uint256 tokenId = patientContract.registerPatient(
-                "Budi Santoso",           // Nama (encrypted in real scenario)
-                "1990-05-15",             // Tanggal Lahir
-                "Laki-laki",              // Gender
-                "O+",                     // Golongan Darah
-                "QmPatientEncryptedData123" // Hash data terenkripsi di IPFS
-            );
+            vm.stopBroadcast();
+            
+            // Patient identity is minted by hospital/admin, not patient
+            vm.startBroadcast(adminKey);
+            
+            // Mint SBT for patient
+            uint256 tokenId = patientContract.mintIdentity(patient);
             
             console.log("  -> NFT Identitas berhasil dicetak!");
             console.log("  -> Token ID:", tokenId);
-            console.log("  -> Patient ID: Anonim (hashed on-chain)");
+            console.log("  -> Patient Address:", patient);
         } else {
             console.log("");
             console.log("[INFO] Pasien sudah terdaftar sebelumnya");
             
             // Get existing profile
-            (
-                string memory name,
-                string memory dob,
-                string memory gender,
-                string memory bloodType,
-                uint256 tokenId,
-                uint256 registeredAt,
-                bool isActive
-            ) = patientContract.getPatientProfile(patient);
+            MedichainPatientIdentity.PatientProfile memory profile = patientContract.getPatientProfile(patient);
+            uint256 existingTokenId = patientContract.getPatientId(patient);
             
-            console.log("  -> Nama:", name);
-            console.log("  -> Token ID:", tokenId);
-            console.log("  -> Registered At:", registeredAt);
+            console.log("  -> Token ID:", existingTokenId);
+            console.log("  -> Registered At:", profile.registrationTimestamp);
+            console.log("  -> Total Records:", profile.totalRecords);
         }
         
         vm.stopBroadcast();
@@ -189,19 +183,14 @@ contract InteractionDemo is Script {
         vm.startBroadcast(patientKey);
         
         // Check current access
-        (
-            MedichainPatientIdentity.AccessType currentAccess,
-            ,
-            uint256 expiresAt,
-            bool isActive
-        ) = patientContract.getAccessPermission(patient, admin);
+        (bool hasAccess, ) = patientContract.checkAccess(patient, admin);
         
-        if (!isActive || currentAccess < MedichainPatientIdentity.AccessType.ADD_RECORDS) {
+        if (!hasAccess) {
             // Grant ADD_RECORDS access for 365 days
             uint256 expiry = block.timestamp + 365 days;
             patientContract.grantAccess(
                 admin,
-                MedichainPatientIdentity.AccessType.ADD_RECORDS,
+                "ADD_RECORDS",
                 expiry
             );
             console.log("  -> Access granted to hospital for 365 days");
@@ -228,12 +217,17 @@ contract InteractionDemo is Script {
         console.log("");
         console.log("[STEP 3] Transaksi ke Lisk Blockchain...");
         
-        // Add medical record
+        // Generate unique IPFS CID and hash using timestamp to avoid duplicates
+        string memory ipfsCid = string(abi.encodePacked("QmTyphoidRecord_", vm.toString(block.timestamp)));
+        bytes32 dataHash = keccak256(abi.encodePacked("typhoid_record_", block.timestamp, patient));
+        
+        // Add medical record (patient, ipfsCid, dataHash, icd10Code, recordType)
         uint256 recordId = patientContract.addMedicalRecord(
             patient,
-            "Diagnosa - Demam Tifoid (ICD-10: A01.0)",  // Record Type
-            "QmTyphoidRecordIPFSHash12345",             // IPFS CID
-            "aes256_encrypted_key_base64_here"          // Encrypted decryption key
+            ipfsCid,     // Unique IPFS CID
+            dataHash,    // Unique Data Hash
+            "A01.0",     // ICD-10 Code
+            "DIAGNOSIS"  // Record Type
         );
         
         console.log("  -> Record ID:", recordId);
@@ -274,6 +268,19 @@ contract InteractionDemo is Script {
         // Simulate new hospital address (for demo, we'll use a derived address)
         address newHospital = address(uint160(uint256(keccak256(abi.encodePacked("RS_B_Address")))));
         
+        // First, admin needs to whitelist the new hospital
+        console.log("[ADMIN] Whitelist RS B terlebih dahulu...");
+        vm.startBroadcast(adminKey);
+        
+        // Check if already whitelisted
+        if (!patientContract.isHospitalAuthorized(newHospital)) {
+            patientContract.whitelistHospital(newHospital, "RS B - Rumah Sakit Budi");
+            console.log("  -> RS B berhasil di-whitelist!");
+        }
+        
+        vm.stopBroadcast();
+        
+        console.log("");
         console.log("[PASIEN KLIK 'IZINKAN']...");
         console.log("");
         
@@ -283,7 +290,7 @@ contract InteractionDemo is Script {
         uint256 expiry = block.timestamp + 30 days;
         patientContract.grantAccess(
             newHospital,
-            MedichainPatientIdentity.AccessType.VIEW_RECORDS,
+            "VIEW_RECORDS",
             expiry
         );
         
@@ -308,55 +315,40 @@ contract InteractionDemo is Script {
      * Tujuan: Menampilkan status akhir semua data
      */
     function scenario5_CheckData() public view {
-        console.log("=====================================================");
+        console.log("=====================================================" );
         console.log("SCENARIO 5: DATA VERIFICATION");
-        console.log("=====================================================");
+        console.log("=====================================================" );
         
         // Get patient profile
-        (
-            string memory name,
-            string memory dob,
-            string memory gender,
-            string memory bloodType,
-            uint256 tokenId,
-            uint256 registeredAt,
-            bool isActive
-        ) = patientContract.getPatientProfile(patient);
+        MedichainPatientIdentity.PatientProfile memory profile = patientContract.getPatientProfile(patient);
+        uint256 patientTokenId = patientContract.getPatientId(patient);
         
         console.log("");
         console.log("[PATIENT DATA]");
-        console.log("  Name:", name);
-        console.log("  DOB:", dob);
-        console.log("  Gender:", gender);
-        console.log("  Blood Type:", bloodType);
-        console.log("  Token ID:", tokenId);
-        console.log("  Registered At:", registeredAt);
-        console.log("  Is Active:", isActive);
+        console.log("  Token ID:", patientTokenId);
+        console.log("  Registered At:", profile.registrationTimestamp);
+        console.log("  Is Active:", profile.isRegistered);
+        console.log("  Last Activity:", profile.lastActivityTimestamp);
         
-        // Get record count
-        uint256 recordCount = patientContract.getPatientRecordCount(patient);
+        // Get record count from profile
         console.log("");
         console.log("[MEDICAL RECORDS]");
-        console.log("  Total Records:", recordCount);
+        console.log("  Total Records:", profile.totalRecords);
         
         // Get accessors
-        address[] memory accessors = patientContract.getPatientAccessors(patient);
+        address[] memory accessors = patientContract.getActiveAccessors(patient);
         console.log("");
         console.log("[ACCESS PERMISSIONS]");
         console.log("  Total Accessors:", accessors.length);
         
         for (uint i = 0; i < accessors.length; i++) {
-            (
-                MedichainPatientIdentity.AccessType accessType,
-                uint256 grantedAt,
-                uint256 expiresAt,
-                bool accessActive
-            ) = patientContract.getAccessPermission(patient, accessors[i]);
+            (bool accessActive, MedichainPatientIdentity.AccessPermission memory perm) = 
+                patientContract.checkAccess(patient, accessors[i]);
             
             console.log("");
             console.log("  Accessor", i + 1);
             console.log("    Address:", accessors[i]);
-            console.log("    Access Type:", uint8(accessType));
+            console.log("    Access Type:", perm.accessType);
             console.log("    Active:", accessActive);
         }
         

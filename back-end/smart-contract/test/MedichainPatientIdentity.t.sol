@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
 import "../src/MedichainPatientIdentity.sol";
+import "../src/MedichainForwarder.sol";
 
 /**
  * @title MedichainPatientIdentityTest
@@ -12,6 +13,7 @@ import "../src/MedichainPatientIdentity.sol";
  */
 contract MedichainPatientIdentityTest is Test {
     MedichainPatientIdentity public patientIdentity;
+    MedichainForwarder public forwarder;
 
     // Test accounts
     address public admin;
@@ -57,8 +59,11 @@ contract MedichainPatientIdentityTest is Test {
         patient2 = vm.addr(patient2PrivateKey);
         unauthorizedUser = vm.addr(0xDEAD);
 
+        // Deploy forwarder first
+        forwarder = new MedichainForwarder(admin);
+
         // Deploy contract (no external hospital registry for basic tests)
-        patientIdentity = new MedichainPatientIdentity(address(0));
+        patientIdentity = new MedichainPatientIdentity(address(0), address(forwarder));
 
         // Whitelist hospitals for subsequent tests
         patientIdentity.whitelistHospital(hospital1, HOSPITAL_NAME_1);
@@ -776,13 +781,13 @@ contract MedichainPatientIdentityTest is Test {
     function test_Constructor_WithHospitalRegistry() public {
         // Deploy with a mock registry address
         address mockRegistry = vm.addr(0xEE62);
-        MedichainPatientIdentity newIdentity = new MedichainPatientIdentity(mockRegistry);
+        MedichainPatientIdentity newIdentity = new MedichainPatientIdentity(mockRegistry, address(forwarder));
         
         assertEq(address(newIdentity.hospitalRegistry()), mockRegistry);
     }
 
     function test_Constructor_WithoutHospitalRegistry() public {
-        MedichainPatientIdentity newIdentity = new MedichainPatientIdentity(address(0));
+        MedichainPatientIdentity newIdentity = new MedichainPatientIdentity(address(0), address(forwarder));
         
         assertEq(address(newIdentity.hospitalRegistry()), address(0));
     }

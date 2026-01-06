@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "../src/MedichainPatientIdentity.sol";
 import "../src/AutomatedHospitalRegistry.sol";
+import "../src/MedichainForwarder.sol";
 
 /**
  * @title IntegrationTest
@@ -13,6 +14,7 @@ import "../src/AutomatedHospitalRegistry.sol";
 contract IntegrationTest is Test {
     MedichainPatientIdentity public patientIdentity;
     AutomatedHospitalRegistry public hospitalRegistry;
+    MedichainForwarder public forwarder;
 
     // Accounts
     address public admin;
@@ -35,11 +37,20 @@ contract IntegrationTest is Test {
         hospital1 = vm.addr(0x40571);
         patient1 = vm.addr(0xA71);
 
-        // 1. Deploy HospitalRegistry first
-        hospitalRegistry = new AutomatedHospitalRegistry(systemVerifier);
+        // 1. Deploy Forwarder first (for gasless transactions)
+        forwarder = new MedichainForwarder(admin);
 
-        // 2. Deploy PatientIdentity with reference to HospitalRegistry
-        patientIdentity = new MedichainPatientIdentity(address(hospitalRegistry));
+        // 2. Deploy HospitalRegistry with forwarder
+        hospitalRegistry = new AutomatedHospitalRegistry(
+            systemVerifier,
+            address(forwarder)
+        );
+
+        // 3. Deploy PatientIdentity with reference to HospitalRegistry and forwarder
+        patientIdentity = new MedichainPatientIdentity(
+            address(hospitalRegistry),
+            address(forwarder)
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -186,7 +197,10 @@ contract IntegrationTest is Test {
         assertEq(address(patientIdentity.hospitalRegistry()), address(hospitalRegistry));
 
         // Deploy a new registry
-        AutomatedHospitalRegistry newRegistry = new AutomatedHospitalRegistry(systemVerifier);
+        AutomatedHospitalRegistry newRegistry = new AutomatedHospitalRegistry(
+            systemVerifier,
+            address(forwarder)
+        );
 
         // Admin updates the registry
         patientIdentity.setHospitalRegistry(address(newRegistry));

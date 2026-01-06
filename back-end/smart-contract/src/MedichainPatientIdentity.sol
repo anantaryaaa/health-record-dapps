@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
 /**
  * @title IHospitalRegistry
@@ -41,8 +42,9 @@ interface IHospitalRegistry {
  * - Patient-controlled access permissions with temporal expiry
  * - Medical record reference registry (IPFS CID tracking)
  * - Event-driven architecture for frontend notifications
+ * - ERC-2771 Meta-Transaction Support (Gasless Transactions)
  */
-contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
+contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard, ERC2771Context {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
 
@@ -108,6 +110,24 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
         uint256 lastActivityTimestamp;
     }
 
+    /**
+     * @notice Struct representing an access request from hospital to patient
+     * @param hospitalAddress Address of the hospital requesting access
+     * @param hospitalName Name of the hospital (for display purposes)
+     * @param requestedAt Unix timestamp when request was made
+     * @param accessDuration Requested access duration in seconds (0 = until revoked)
+     * @param message Optional message from hospital
+     * @param status Request status: 0=Pending, 1=Approved, 2=Rejected
+     */
+    struct AccessRequest {
+        address hospitalAddress;
+        string hospitalName;
+        uint256 requestedAt;
+        uint256 accessDuration;
+        string message;
+        uint8 status; // 0=Pending, 1=Approved, 2=Rejected
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
     // ═══════════════════════════════════════════════════════════════════════════
@@ -138,6 +158,12 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
 
     /// @notice Whitelisted hospitals mapping for quick lookup
     mapping(address => bool) public isWhitelistedHospital;
+
+    /// @notice Pending access requests: patient => AccessRequest[]
+    mapping(address => AccessRequest[]) private _pendingAccessRequests;
+
+    /// @notice Counter for access request IDs
+    uint256 private _accessRequestCounter;
 
     /// @notice Reference to the external Hospital Registry contract
     IHospitalRegistry public hospitalRegistry;
@@ -234,6 +260,46 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
      */
     event HospitalRegistryUpdated(address indexed registryAddress);
 
+    /**
+     * @notice Emitted when a hospital requests access to a patient's data (via QR scan)
+     * @param patient The patient being requested
+     * @param hospital The hospital requesting access
+     * @param hospitalName The name of the hospital
+     * @param requestIndex The index of this request in patient's pending list
+     * @param accessDuration Requested access duration in seconds
+     */
+    event AccessRequested(
+        address indexed patient,
+        address indexed hospital,
+        string hospitalName,
+        uint256 requestIndex,
+        uint256 accessDuration
+    );
+
+    /**
+     * @notice Emitted when patient approves an access request
+     * @param patient The patient approving access
+     * @param hospital The hospital receiving access
+     * @param requestIndex The index of the approved request
+     */
+    event AccessRequestApproved(
+        address indexed patient,
+        address indexed hospital,
+        uint256 requestIndex
+    );
+
+    /**
+     * @notice Emitted when patient rejects an access request
+     * @param patient The patient rejecting access
+     * @param hospital The hospital whose request was rejected
+     * @param requestIndex The index of the rejected request
+     */
+    event AccessRequestRejected(
+        address indexed patient,
+        address indexed hospital,
+        uint256 requestIndex
+    );
+
     // ═══════════════════════════════════════════════════════════════════════════
     // ERRORS
     // ═══════════════════════════════════════════════════════════════════════════
@@ -271,15 +337,25 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
     /// @dev Error when invalid record index is provided
     error InvalidRecordIndex();
 
+    /// @dev Error when access request index is invalid
+    error InvalidAccessRequestIndex();
+
+    /// @dev Error when access request is not pending
+    error AccessRequestNotPending();
+
+    /// @dev Error when hospital already has a pending request
+    error AccessRequestAlreadyPending();
+
     // ═══════════════════════════════════════════════════════════════════════════
     // MODIFIERS
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * @dev Modifier to check if the caller is a registered patient
+     * @dev Uses _msgSender() for ERC-2771 meta-transaction support
      */
     modifier onlyRegisteredPatient() {
-        if (!patientProfiles[msg.sender].isRegistered) {
+        if (!patientProfiles[_msgSender()].isRegistered) {
             revert PatientNotRegistered();
         }
         _;
@@ -344,8 +420,12 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
      * @notice Initializes the Medichain Patient Identity contract
      * @dev Sets up the ERC-721 token with name and symbol, grants admin role to deployer
      * @param _hospitalRegistry Optional address of AutomatedHospitalRegistry (can be address(0))
+     * @param _trustedForwarder Address of the ERC-2771 trusted forwarder for gasless transactions
      */
-    constructor(address _hospitalRegistry) ERC721("Medichain Patient Identity", "MEDID") {
+    constructor(
+        address _hospitalRegistry, 
+        address _trustedForwarder
+    ) ERC721("Medichain Patient Identity", "MEDID") ERC2771Context(_trustedForwarder) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
         _patientIdCounter = 1; // Start from 1, 0 is reserved for "not registered"
@@ -373,7 +453,56 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Mints a new Soulbound patient identity NFT
+     * @notice Allows a patient to register themselves and mint their own identity NFT
+     * @dev This is the self-registration function for patients. Creates a unique,
+     *      non-transferable NFT that serves as the patient's identity.
+     * @return patientId The unique patient ID assigned
+     * 
+     * Requirements:
+     * - Caller must not already have an identity
+     * 
+     * Emits:
+     * - {IdentityMinted} event
+     * - Standard ERC-721 {Transfer} event
+     */
+    function selfRegister() 
+        external 
+        nonReentrant
+        returns (uint256 patientId) 
+    {
+        address patientWallet = _msgSender();
+        
+        // Check patient is not already registered
+        if (patientProfiles[patientWallet].isRegistered) {
+            revert PatientAlreadyRegistered();
+        }
+
+        // Generate new patient ID
+        patientId = _patientIdCounter;
+        _patientIdCounter++;
+
+        // Mint the Soulbound NFT
+        _safeMint(patientWallet, patientId);
+
+        // Update mappings
+        walletToPatientId[patientWallet] = patientId;
+        patientIdToWallet[patientId] = patientWallet;
+
+        // Initialize patient profile
+        patientProfiles[patientWallet] = PatientProfile({
+            isRegistered: true,
+            registrationTimestamp: block.timestamp,
+            totalRecords: 0,
+            lastActivityTimestamp: block.timestamp
+        });
+
+        emit IdentityMinted(patientWallet, patientId, block.timestamp);
+
+        return patientId;
+    }
+
+    /**
+     * @notice Mints a new Soulbound patient identity NFT (admin/hospital only)
      * @dev Called by the system during patient onboarding. Creates a unique, 
      *      non-transferable NFT that serves as the patient's identity.
      * @param _patientWallet The wallet address of the patient
@@ -533,18 +662,20 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
         notZeroAddress(_accessor)
         onlyWhitelistedHospital(_accessor)
     {
+        address sender = _msgSender();
+        
         // Validate expiry timestamp if provided
         if (_expiresAt != 0 && _expiresAt <= block.timestamp) {
             revert InvalidExpiryTimestamp();
         }
 
         // Check if this is a new accessor
-        if (!accessPermissions[msg.sender][_accessor].isGranted) {
-            _grantedAccessList[msg.sender].push(_accessor);
+        if (!accessPermissions[sender][_accessor].isGranted) {
+            _grantedAccessList[sender].push(_accessor);
         }
 
         // Update permission matrix
-        accessPermissions[msg.sender][_accessor] = AccessPermission({
+        accessPermissions[sender][_accessor] = AccessPermission({
             isGranted: true,
             expiresAt: _expiresAt,
             grantedAt: block.timestamp,
@@ -552,9 +683,9 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
         });
 
         // Update last activity
-        patientProfiles[msg.sender].lastActivityTimestamp = block.timestamp;
+        patientProfiles[sender].lastActivityTimestamp = block.timestamp;
 
-        emit AccessGranted(msg.sender, _accessor, _accessType, _expiresAt);
+        emit AccessGranted(sender, _accessor, _accessType, _expiresAt);
     }
 
     /**
@@ -575,18 +706,20 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
         onlyRegisteredPatient
         notZeroAddress(_accessor)
     {
-        if (!accessPermissions[msg.sender][_accessor].isGranted) {
+        address sender = _msgSender();
+        
+        if (!accessPermissions[sender][_accessor].isGranted) {
             revert AccessNotGranted();
         }
 
         // Revoke permission
-        accessPermissions[msg.sender][_accessor].isGranted = false;
-        accessPermissions[msg.sender][_accessor].expiresAt = block.timestamp;
+        accessPermissions[sender][_accessor].isGranted = false;
+        accessPermissions[sender][_accessor].expiresAt = block.timestamp;
 
         // Update last activity
-        patientProfiles[msg.sender].lastActivityTimestamp = block.timestamp;
+        patientProfiles[sender].lastActivityTimestamp = block.timestamp;
 
-        emit AccessRevoked(msg.sender, _accessor, block.timestamp);
+        emit AccessRevoked(sender, _accessor, block.timestamp);
     }
 
     /**
@@ -662,6 +795,228 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // ACCESS REQUEST SYSTEM (QR Code Flow)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Hospital requests access to a patient's data (called after scanning QR)
+     * @dev Creates a pending access request that patient must approve
+     * @param _patient The patient's wallet address (from QR code)
+     * @param _hospitalName Name of the hospital for display
+     * @param _accessDuration Requested access duration in seconds (0 = until revoked)
+     * @param _message Optional message explaining why access is needed
+     * 
+     * Requirements:
+     * - Patient must be registered
+     * - Hospital must be whitelisted
+     * - No existing pending request from this hospital
+     * 
+     * Emits:
+     * - {AccessRequested} event
+     */
+    function requestAccess(
+        address _patient,
+        string calldata _hospitalName,
+        uint256 _accessDuration,
+        string calldata _message
+    ) 
+        external 
+        nonReentrant
+        notZeroAddress(_patient)
+        onlyWhitelistedHospital(_msgSender())
+    {
+        address hospital = _msgSender();
+        
+        // Check patient is registered
+        if (!patientProfiles[_patient].isRegistered) {
+            revert PatientNotRegistered();
+        }
+
+        // Check no existing pending request from this hospital
+        AccessRequest[] storage requests = _pendingAccessRequests[_patient];
+        for (uint256 i = 0; i < requests.length; i++) {
+            if (requests[i].hospitalAddress == hospital && requests[i].status == 0) {
+                revert AccessRequestAlreadyPending();
+            }
+        }
+
+        // Create new access request
+        uint256 requestIndex = requests.length;
+        requests.push(AccessRequest({
+            hospitalAddress: hospital,
+            hospitalName: _hospitalName,
+            requestedAt: block.timestamp,
+            accessDuration: _accessDuration,
+            message: _message,
+            status: 0 // Pending
+        }));
+
+        emit AccessRequested(_patient, hospital, _hospitalName, requestIndex, _accessDuration);
+    }
+
+    /**
+     * @notice Patient approves an access request
+     * @dev Grants access to the requesting hospital
+     * @param _requestIndex Index of the request to approve
+     * 
+     * Requirements:
+     * - Caller must be the patient
+     * - Request must exist and be pending
+     * 
+     * Emits:
+     * - {AccessRequestApproved} event
+     * - {AccessGranted} event
+     */
+    function approveAccessRequest(uint256 _requestIndex) 
+        external 
+        nonReentrant
+        onlyRegisteredPatient
+    {
+        address patient = _msgSender();
+        AccessRequest[] storage requests = _pendingAccessRequests[patient];
+        
+        if (_requestIndex >= requests.length) {
+            revert InvalidAccessRequestIndex();
+        }
+        
+        AccessRequest storage request = requests[_requestIndex];
+        
+        if (request.status != 0) {
+            revert AccessRequestNotPending();
+        }
+
+        // Update request status
+        request.status = 1; // Approved
+
+        // Calculate expiry
+        uint256 expiresAt = request.accessDuration == 0 
+            ? 0 
+            : block.timestamp + request.accessDuration;
+
+        // Grant access
+        if (!accessPermissions[patient][request.hospitalAddress].isGranted) {
+            _grantedAccessList[patient].push(request.hospitalAddress);
+        }
+
+        accessPermissions[patient][request.hospitalAddress] = AccessPermission({
+            isGranted: true,
+            expiresAt: expiresAt,
+            grantedAt: block.timestamp,
+            accessType: "FULL"
+        });
+
+        // Update last activity
+        patientProfiles[patient].lastActivityTimestamp = block.timestamp;
+
+        emit AccessRequestApproved(patient, request.hospitalAddress, _requestIndex);
+        emit AccessGranted(patient, request.hospitalAddress, "FULL", expiresAt);
+    }
+
+    /**
+     * @notice Patient rejects an access request
+     * @dev Marks the request as rejected
+     * @param _requestIndex Index of the request to reject
+     * 
+     * Requirements:
+     * - Caller must be the patient
+     * - Request must exist and be pending
+     * 
+     * Emits:
+     * - {AccessRequestRejected} event
+     */
+    function rejectAccessRequest(uint256 _requestIndex) 
+        external 
+        nonReentrant
+        onlyRegisteredPatient
+    {
+        address patient = _msgSender();
+        AccessRequest[] storage requests = _pendingAccessRequests[patient];
+        
+        if (_requestIndex >= requests.length) {
+            revert InvalidAccessRequestIndex();
+        }
+        
+        AccessRequest storage request = requests[_requestIndex];
+        
+        if (request.status != 0) {
+            revert AccessRequestNotPending();
+        }
+
+        // Update request status
+        request.status = 2; // Rejected
+
+        // Update last activity
+        patientProfiles[patient].lastActivityTimestamp = block.timestamp;
+
+        emit AccessRequestRejected(patient, request.hospitalAddress, _requestIndex);
+    }
+
+    /**
+     * @notice Returns all pending access requests for a patient
+     * @param _patient The patient's wallet address
+     * @return requests Array of all access requests (including processed ones)
+     */
+    function getAccessRequests(address _patient) 
+        external 
+        view 
+        returns (AccessRequest[] memory) 
+    {
+        return _pendingAccessRequests[_patient];
+    }
+
+    /**
+     * @notice Returns only pending access requests for a patient
+     * @param _patient The patient's wallet address
+     * @return pendingRequests Array of pending access requests
+     */
+    function getPendingAccessRequests(address _patient) 
+        external 
+        view 
+        returns (AccessRequest[] memory) 
+    {
+        AccessRequest[] memory allRequests = _pendingAccessRequests[_patient];
+        uint256 pendingCount = 0;
+
+        // First pass: count pending requests
+        for (uint256 i = 0; i < allRequests.length; i++) {
+            if (allRequests[i].status == 0) {
+                pendingCount++;
+            }
+        }
+
+        // Second pass: populate array
+        AccessRequest[] memory pendingRequests = new AccessRequest[](pendingCount);
+        uint256 index = 0;
+        for (uint256 i = 0; i < allRequests.length; i++) {
+            if (allRequests[i].status == 0) {
+                pendingRequests[index] = allRequests[i];
+                index++;
+            }
+        }
+
+        return pendingRequests;
+    }
+
+    /**
+     * @notice Returns the count of pending access requests for a patient
+     * @param _patient The patient's wallet address
+     * @return count Number of pending requests
+     */
+    function getPendingAccessRequestCount(address _patient) 
+        external 
+        view 
+        returns (uint256 count) 
+    {
+        AccessRequest[] memory allRequests = _pendingAccessRequests[_patient];
+        for (uint256 i = 0; i < allRequests.length; i++) {
+            if (allRequests[i].status == 0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // MEDICAL RECORD REGISTRY (Patient View)
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -693,10 +1048,16 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
     ) 
         external 
         nonReentrant
-        onlyWhitelistedHospital(msg.sender)
         notZeroAddress(_patient)
         returns (uint256 recordIndex) 
     {
+        address sender = _msgSender();
+        
+        // Verify hospital is authorized
+        if (!_isHospitalAuthorized(sender)) {
+            revert HospitalNotWhitelisted();
+        }
+        
         // Verify patient is registered
         if (!patientProfiles[_patient].isRegistered) {
             revert PatientNotRegistered();
@@ -714,7 +1075,7 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
         MedicalRecordRef memory newRecord = MedicalRecordRef({
             ipfsCid: _ipfsCid,
             dataHash: _dataHash,
-            hospitalAddress: msg.sender,
+            hospitalAddress: sender,
             timestamp: block.timestamp,
             icd10Code: _icd10Code,
             recordType: _recordType,
@@ -729,7 +1090,7 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
         patientProfiles[_patient].totalRecords++;
         patientProfiles[_patient].lastActivityTimestamp = block.timestamp;
 
-        emit RecordAdded(_patient, msg.sender, _ipfsCid, recordIndex, _icd10Code);
+        emit RecordAdded(_patient, sender, _ipfsCid, recordIndex, _icd10Code);
 
         return recordIndex;
     }
@@ -986,6 +1347,55 @@ contract MedichainPatientIdentity is ERC721, AccessControl, ReentrancyGuard {
         returns (uint256) 
     {
         return _patientIdCounter - 1; // Subtract 1 since counter starts at 1
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ERC-2771 CONTEXT OVERRIDES (Required for Meta-Transaction Support)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Override _msgSender to support meta-transactions
+     * @dev Returns the actual sender when called via trusted forwarder
+     * @return The original transaction sender
+     */
+    function _msgSender() 
+        internal 
+        view 
+        virtual 
+        override(Context, ERC2771Context) 
+        returns (address) 
+    {
+        return ERC2771Context._msgSender();
+    }
+
+    /**
+     * @notice Override _msgData to support meta-transactions  
+     * @dev Returns the actual calldata when called via trusted forwarder
+     * @return The original transaction calldata
+     */
+    function _msgData() 
+        internal 
+        view 
+        virtual 
+        override(Context, ERC2771Context) 
+        returns (bytes calldata) 
+    {
+        return ERC2771Context._msgData();
+    }
+
+    /**
+     * @notice Override _contextSuffixLength for ERC2771 support
+     * @dev Required for proper calldata handling with trusted forwarder
+     * @return The length of the context suffix (sender address = 20 bytes)
+     */
+    function _contextSuffixLength() 
+        internal 
+        view 
+        virtual 
+        override(Context, ERC2771Context) 
+        returns (uint256) 
+    {
+        return ERC2771Context._contextSuffixLength();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
