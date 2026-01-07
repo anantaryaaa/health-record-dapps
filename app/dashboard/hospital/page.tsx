@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { isHospitalRegistered, getHospitalData } from "@/lib/hospitalStorage";
+import { isHospitalRegistered, getHospitalData, saveHospitalData, HospitalData } from "@/lib/hospitalStorage";
 import { getPatientData } from "@/lib/patientStorage";
 import { 
   requestPatientAccess, 
@@ -33,7 +33,9 @@ import {
   hasPatientIdentity,
   addMedicalRecord,
   createDataHash,
-  getPatientRecords
+  getPatientRecords,
+  hasHospitalProfile,
+  getHospitalProfile as getHospitalProfileFromChain
 } from "@/lib/services/blockchain";
 import { uploadMedicalRecord, getMedicalRecord, type MedicalRecordData } from "@/lib/services/ipfs";
 
@@ -100,18 +102,71 @@ export default function HospitalDashboard() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   
   // Hospital data
-  const hospitalData = account ? getHospitalData(account.address) : null;
+  const [hospitalData, setHospitalData] = useState<HospitalData | null>(null);
+  const [isLoadingHospital, setIsLoadingHospital] = useState(true);
 
   useEffect(() => {
-    if (!account) {
-      router.push("/auth");
-      return;
-    }
+    const checkAndLoadHospital = async () => {
+      if (!account) {
+        router.push("/auth");
+        return;
+      }
+      
+      setIsLoadingHospital(true);
+      
+      // First check localStorage
+      let localData = getHospitalData(account.address);
+      
+      if (localData) {
+        setHospitalData(localData);
+        setIsLoadingHospital(false);
+        return;
+      }
+      
+      // If not in localStorage, check blockchain
+      try {
+        const hasProfile = await hasHospitalProfile(account.address);
+        
+        if (hasProfile) {
+          // Fetch from blockchain and save to localStorage
+          const profileData = await getHospitalProfileFromChain(account.address);
+          
+          if (profileData) {
+            const hospitalDataFromChain: HospitalData = {
+              name: profileData.name,
+              type: profileData.hospitalType as HospitalData["type"],
+              licenseNumber: profileData.licenseNumber,
+              address: profileData.physicalAddress,
+              city: profileData.city,
+              phone: profileData.phone,
+              picName: profileData.picName,
+              picPosition: profileData.picPosition,
+              picPhone: profileData.picPhone,
+              picEmail: profileData.picEmail,
+              walletAddress: account.address,
+              registeredAt: new Date(profileData.createdAt * 1000).toISOString(),
+            };
+            
+            // Save to localStorage for future use
+            saveHospitalData(hospitalDataFromChain);
+            setHospitalData(hospitalDataFromChain);
+            setIsLoadingHospital(false);
+            return;
+          }
+        }
+        
+        // Not registered anywhere, redirect to registration
+        router.push("/dashboard/hospital/registration");
+      } catch (error) {
+        console.error("Error checking hospital profile:", error);
+        // If blockchain check fails, redirect to registration
+        router.push("/dashboard/hospital/registration");
+      } finally {
+        setIsLoadingHospital(false);
+      }
+    };
     
-    // Check if hospital is registered, redirect to registration if not
-    if (!isHospitalRegistered(account.address)) {
-      router.push("/dashboard/hospital/registration");
-    }
+    checkAndLoadHospital();
   }, [account, router]);
 
   if (!account) {
@@ -119,8 +174,15 @@ export default function HospitalDashboard() {
   }
   
   // Show loading while checking registration
-  if (!hospitalData) {
-    return null;
+  if (isLoadingHospital || !hospitalData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+          <p className="text-muted-foreground">Loading hospital data...</p>
+        </div>
+      </div>
+    );
   }
 
   const handlePatientFound = (data: ScannedPatientData) => {

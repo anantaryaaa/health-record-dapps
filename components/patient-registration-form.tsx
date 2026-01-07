@@ -1,10 +1,8 @@
 "use client"
 
-import * as React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
-import { zodValidator } from "@tanstack/zod-form-adapter"
 import { useActiveAccount } from "thirdweb/react"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,8 +23,18 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { savePatientData, PatientData } from "@/lib/patientStorage"
-import { selfRegisterPatient, getExplorerUrl } from "@/lib/services/blockchain"
-import { User, CreditCard, Droplets, Users, Calendar, Loader2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react"
+import { 
+  selfRegisterPatient, 
+  hasPatientIdentity, 
+  getExplorerUrl,
+  hasPatientProfile,
+  getPatientProfileEncrypted,
+  setPatientProfile,
+  encodePatientProfile,
+  decodePatientProfile,
+  type PatientProfileData
+} from "@/lib/services/blockchain"
+import { User, CreditCard, Calendar, Loader2, CheckCircle2, AlertCircle, ExternalLink, RefreshCw } from "lucide-react"
 
 // Define Schema
 const patientSchema = z.object({
@@ -51,16 +59,60 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
   const [mintError, setMintError] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
   
+  // New states for checking existing registration
+  const [isCheckingBlockchain, setIsCheckingBlockchain] = useState(true)
+  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false)
+  const [hasExistingProfile, setHasExistingProfile] = useState(false)
+  const [existingProfileData, setExistingProfileData] = useState<PatientProfileData | null>(null)
+  
+  // Check if patient is already registered on blockchain
+  useEffect(() => {
+    const checkRegistration = async () => {
+      if (!walletAddress) return
+      
+      setIsCheckingBlockchain(true)
+      try {
+        // Check if has identity NFT
+        const registered = await hasPatientIdentity(walletAddress)
+        setIsAlreadyRegistered(registered)
+        
+        // If registered, also check if has profile on-chain
+        if (registered) {
+          const profileExists = await hasPatientProfile(walletAddress)
+          setHasExistingProfile(profileExists)
+          
+          // If profile exists, fetch and decode it
+          if (profileExists) {
+            const encryptedProfile = await getPatientProfileEncrypted(walletAddress)
+            if (encryptedProfile) {
+              const decoded = decodePatientProfile(encryptedProfile)
+              setExistingProfileData(decoded)
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error checking registration:", error)
+        // Assume not registered if check fails
+        setIsAlreadyRegistered(false)
+        setHasExistingProfile(false)
+      } finally {
+        setIsCheckingBlockchain(false)
+      }
+    }
+    
+    checkRegistration()
+  }, [walletAddress])
+  
   const form = useForm({
     defaultValues: {
       name: "",
       nik: "",
       bloodType: "O+" as const,
       gender: "Male" as const,
-      age: "" as any,
-    } as any,
+      age: "" as unknown as number,
+    },
     validators: {
-      onChange: patientSchema as any,
+      onChange: patientSchema as never,
     },
     onSubmit: async ({ value }) => {
       if (!account) {
@@ -73,23 +125,52 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
       setTxHash(null)
       
       try {
-        // 1. Mint NFT Identity on blockchain
-        console.log("Minting patient identity NFT...")
-        const mintResult = await selfRegisterPatient(account)
-        
-        if (!mintResult.success) {
-          throw new Error(mintResult.error || "Failed to mint identity NFT")
+        // If NOT already registered, mint NFT first
+        if (!isAlreadyRegistered) {
+          console.log("Minting patient identity NFT...")
+          const mintResult = await selfRegisterPatient(account)
+          
+          if (!mintResult.success) {
+            throw new Error(mintResult.error || "Failed to mint identity NFT")
+          }
+          
+          console.log("NFT minted successfully:", mintResult.txHash)
+          setTxHash(mintResult.txHash || null)
+        } else {
+          console.log("Patient already registered on blockchain, skipping minting...")
         }
         
-        console.log("NFT minted successfully:", mintResult.txHash)
-        setTxHash(mintResult.txHash || null)
+        // Prepare profile data for blockchain
+        const profileData: PatientProfileData = {
+          name: value.name,
+          nik: value.nik,
+          bloodType: value.bloodType,
+          gender: value.gender,
+          dateOfBirth: "", // Can be added later
+        }
         
-        // 2. Save to localStorage as cache
+        // Save profile to blockchain (if not already exists or updating)
+        if (!hasExistingProfile) {
+          console.log("Saving profile to blockchain...")
+          const encodedProfile = encodePatientProfile(profileData)
+          const profileResult = await setPatientProfile(account, encodedProfile)
+          
+          if (!profileResult.success) {
+            console.warn("Failed to save profile to blockchain:", profileResult.error)
+            // Don't throw - localStorage backup will still work
+          } else {
+            console.log("Profile saved to blockchain:", profileResult.txHash)
+          }
+        } else {
+          console.log("Profile already exists on blockchain, skipping...")
+        }
+        
+        // Save to localStorage (for both new and existing patients)
         const newData: PatientData = {
           name: value.name,
           nik: value.nik,
-          bloodType: value.bloodType as any,
-          gender: value.gender as any,
+          bloodType: value.bloodType,
+          gender: value.gender,
           age: Number(value.age),
           walletAddress: walletAddress,
           linkedAddresses: [],
@@ -98,16 +179,44 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
         
         savePatientData(newData)
         
-        // 3. Complete registration
+        // Complete registration
         onComplete(newData)
       } catch (error) {
         console.error("Registration error:", error)
-        setMintError(error instanceof Error ? error.message : "Failed to register on blockchain")
+        setMintError(error instanceof Error ? error.message : "Failed to register")
       } finally {
         setIsMinting(false)
       }
     },
   })
+
+  // Update form values when existingProfileData is loaded from blockchain
+  useEffect(() => {
+    if (existingProfileData) {
+      form.setFieldValue("name", existingProfileData.name || "")
+      form.setFieldValue("nik", existingProfileData.nik || "")
+      if (existingProfileData.bloodType) {
+        form.setFieldValue("bloodType", existingProfileData.bloodType as never)
+      }
+      if (existingProfileData.gender) {
+        form.setFieldValue("gender", existingProfileData.gender as never)
+      }
+    }
+  }, [existingProfileData, form])
+
+  // Loading state while checking blockchain
+  if (isCheckingBlockchain) {
+    return (
+      <Card className="w-full max-w-lg mx-auto shadow-lg border-border/50 bg-card/80 backdrop-blur-sm">
+        <CardContent className="py-16">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <p className="text-muted-foreground">Checking blockchain registration...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className="w-full max-w-lg mx-auto shadow-lg border-border/50 bg-card/80 backdrop-blur-sm">
@@ -116,11 +225,44 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
           <div className="p-2 bg-primary/10 rounded-lg">
              <User className="w-6 h-6 text-primary" />
           </div>
-          Patient Registration
+          {isAlreadyRegistered ? "Sync Your Profile" : "Patient Registration"}
         </CardTitle>
         <CardDescription>
-          Complete your profile to access decentralized health records.
+          {isAlreadyRegistered ? (
+            <>
+              Your wallet is already registered on the blockchain. 
+              Please fill in your profile details to sync with this device.
+            </>
+          ) : (
+            "Complete your profile to access decentralized health records."
+          )}
         </CardDescription>
+        
+        {/* Already Registered Badge */}
+        {isAlreadyRegistered && (
+          <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <span className="text-sm text-emerald-600 font-medium">
+              Identity NFT already exists on blockchain
+            </span>
+          </div>
+        )}
+        
+        {/* Profile exists on blockchain */}
+        {hasExistingProfile && existingProfileData && (
+          <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <RefreshCw className="w-4 h-4 text-blue-600" />
+              <span className="text-sm text-blue-600 font-medium">
+                Profile found on blockchain
+              </span>
+            </div>
+            <p className="text-xs text-blue-600/80">
+              Your profile data has been pre-filled from the blockchain. 
+              Just verify and sync to this device.
+            </p>
+          </div>
+        )}
       </CardHeader>
       
       <CardContent>
@@ -152,8 +294,8 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
                 />
                 {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
                   <ul className="text-xs text-destructive list-disc list-inside bg-destructive/5 p-2 rounded-md">
-                    {field.state.meta.errors.map((err: any, i: number) => (
-                      <li key={i}>{err?.message || err}</li>
+                    {field.state.meta.errors.map((err: unknown, i: number) => (
+                      <li key={i}>{typeof err === 'object' && err !== null && 'message' in err ? (err as {message: string}).message : String(err)}</li>
                     ))}
                   </ul>
                 )}
@@ -177,15 +319,15 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
-                    placeholder="16-digit Nik Number"
+                    placeholder="16-digit NIK Number"
                     maxLength={16}
                     className={`pl-9 ${field.state.meta.errors.length ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   />
                 </div>
                 {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
                   <ul className="text-xs text-destructive list-disc list-inside bg-destructive/5 p-2 rounded-md">
-                    {field.state.meta.errors.map((err: any, i: number) => (
-                      <li key={i}>{err?.message || err}</li>
+                    {field.state.meta.errors.map((err: unknown, i: number) => (
+                      <li key={i}>{typeof err === 'object' && err !== null && 'message' in err ? (err as {message: string}).message : String(err)}</li>
                     ))}
                   </ul>
                 )}
@@ -202,7 +344,7 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
                     <Label className="flex items-center gap-2 font-medium">Blood Type</Label>
                     <Select
                        value={field.state.value}
-                       onValueChange={(val) => field.handleChange(val)}
+                       onValueChange={(val) => field.handleChange(val as never)}
                     >
                       <SelectTrigger className={field.state.meta.errors.length ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select" />
@@ -215,8 +357,8 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
                     </Select>
                      {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
                       <ul className="text-xs text-destructive list-disc list-inside bg-destructive/5 p-2 rounded-md">
-                        {field.state.meta.errors.map((err: any, i: number) => (
-                          <li key={i}>{err?.message || err}</li>
+                        {field.state.meta.errors.map((err: unknown, i: number) => (
+                          <li key={i}>{typeof err === 'object' && err !== null && 'message' in err ? (err as {message: string}).message : String(err)}</li>
                         ))}
                       </ul>
                     )}
@@ -232,7 +374,7 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
                     <Label className="flex items-center gap-2 font-medium">Gender</Label>
                     <Select
                        value={field.state.value}
-                       onValueChange={(val) => field.handleChange(val)}
+                       onValueChange={(val) => field.handleChange(val as never)}
                     >
                       <SelectTrigger className={field.state.meta.errors.length ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select" />
@@ -245,8 +387,8 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
                     </Select>
                      {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
                       <ul className="text-xs text-destructive list-disc list-inside bg-destructive/5 p-2 rounded-md">
-                        {field.state.meta.errors.map((err: any, i: number) => (
-                          <li key={i}>{err?.message || err}</li>
+                        {field.state.meta.errors.map((err: unknown, i: number) => (
+                          <li key={i}>{typeof err === 'object' && err !== null && 'message' in err ? (err as {message: string}).message : String(err)}</li>
                         ))}
                       </ul>
                     )}
@@ -269,7 +411,7 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
                        type="number"
                        value={field.state.value}
                        onBlur={field.handleBlur}
-                       onChange={(e) => field.handleChange(e.target.value === "" ? "" : Number(e.target.value))}
+                       onChange={(e) => field.handleChange(e.target.value === "" ? "" as unknown as number : Number(e.target.value))}
                        placeholder="Enter your age..."
                        min={1}
                        max={120}
@@ -278,8 +420,8 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
                  </div>
                   {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
                     <ul className="text-xs text-destructive list-disc list-inside bg-destructive/5 p-2 rounded-md">
-                      {field.state.meta.errors.map((err: any, i: number) => (
-                        <li key={i}>{err?.message || err}</li>
+                      {field.state.meta.errors.map((err: unknown, i: number) => (
+                        <li key={i}>{typeof err === 'object' && err !== null && 'message' in err ? (err as {message: string}).message : String(err)}</li>
                       ))}
                     </ul>
                   )}
@@ -294,7 +436,9 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
           <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-destructive">Registration Failed</p>
+              <p className="font-medium text-destructive">
+                {isAlreadyRegistered ? "Sync Failed" : "Registration Failed"}
+              </p>
               <p className="text-sm text-destructive/80">{mintError}</p>
             </div>
           </div>
@@ -332,10 +476,15 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
               {isMinting ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Minting Identity NFT...
+                  {isAlreadyRegistered ? "Syncing Profile..." : "Minting Identity NFT..."}
                 </>
               ) : isSubmitting ? (
                 "Processing..."
+              ) : isAlreadyRegistered ? (
+                <>
+                  <RefreshCw className="w-5 h-5 mr-2" />
+                  Sync Profile to Device
+                </>
               ) : (
                 <>
                   <CheckCircle2 className="w-5 h-5 mr-2" />
@@ -346,7 +495,10 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
           )}
         />
         <p className="text-xs text-muted-foreground text-center">
-          This will create a Soulbound NFT (non-transferable) as your identity on the blockchain.
+          {isAlreadyRegistered 
+            ? "Your profile data will be saved locally on this device."
+            : "This will create a Soulbound NFT (non-transferable) as your identity on the blockchain."
+          }
         </p>
       </CardFooter>
     </Card>

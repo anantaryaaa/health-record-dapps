@@ -2,7 +2,8 @@
 "use client"
 
 import Link from "next/link"
-import { Github as GithubIcon, Linkedin as LinkedinIcon, Twitter as TwitterIcon, Heart, Shield, ExternalLink } from "lucide-react"
+import { Heart, Shield, ExternalLink } from "lucide-react"
+import { SiGithub, SiX } from "@icons-pack/react-simple-icons"
 import { NetworkLisk } from "@web3icons/react"
 
 interface FooterProps {
@@ -10,9 +11,8 @@ interface FooterProps {
 }
 
 const socialLinks = [
-  { icon: TwitterIcon, href: "https://twitter.com", label: "Twitter" },
-  { icon: LinkedinIcon, href: "https://linkedin.com", label: "LinkedIn" },
-  { icon: GithubIcon, href: "https://github.com", label: "GitHub" },
+  { icon: SiX, href: "https://twitter.com", label: "X (Twitter)" },
+  { icon: SiGithub, href: "https://github.com", label: "GitHub" },
 ]
 
 const footerLinks = {

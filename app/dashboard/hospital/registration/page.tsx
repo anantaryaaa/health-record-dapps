@@ -31,6 +31,14 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { saveHospitalData, isHospitalRegistered, HospitalData } from "@/lib/hospitalStorage";
+import { 
+  setHospitalProfile, 
+  hasHospitalProfile, 
+  getHospitalProfile as getHospitalProfileFromChain,
+  registerHospitalInRegistry,
+  isHospitalVerifiedInRegistry,
+  getHospitalDetailsFromRegistry
+} from "@/lib/services/blockchain";
 
 type Step = 1 | 2;
 
@@ -49,18 +57,39 @@ interface FormData {
   picEmail: string;
 }
 
-// Whitelist hospital on blockchain
+// Get signature from backend for hospital registration
+async function getRegistrationSignature(
+  hospitalAddress: string, 
+  hospitalName: string, 
+  licenseNumber: string
+): Promise<{ success: boolean; signature?: string; error?: string }> {
+  try {
+    const response = await fetch("/api/hospital/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hospitalAddress, hospitalName, licenseNumber }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to get signature");
+    }
+
+    return { success: true, signature: data.signature };
+  } catch (error) {
+    console.error("Signature error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+// Whitelist hospital on blockchain (for patient access)
 async function whitelistHospitalOnChain(hospitalAddress: string, hospitalName: string): Promise<{ success: boolean; txHash?: string; error?: string }> {
   try {
     const response = await fetch("/api/hospital/whitelist", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        hospitalAddress,
-        hospitalName,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hospitalAddress, hospitalName }),
     });
 
     const data = await response.json();
@@ -69,14 +98,10 @@ async function whitelistHospitalOnChain(hospitalAddress: string, hospitalName: s
       throw new Error(data.error || "Failed to whitelist hospital");
     }
 
-    return {
-      success: true,
-      txHash: data.txHash,
-    };
+    return { success: true, txHash: data.txHash };
   } catch (error) {
     console.error("Whitelist error:", error);
-    return {
-      success: false,
+    return { success: false,
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
@@ -105,15 +130,49 @@ export default function HospitalRegistration() {
   });
 
   useEffect(() => {
-    if (!account) {
-      router.push("/auth");
-      return;
-    }
+    const checkRegistration = async () => {
+      if (!account) {
+        router.push("/auth");
+        return;
+      }
+      
+      // First check localStorage
+      if (isHospitalRegistered(account.address)) {
+        router.push("/dashboard/hospital");
+        return;
+      }
+      
+      // Also check blockchain for existing profile
+      try {
+        const hasProfile = await hasHospitalProfile(account.address);
+        if (hasProfile) {
+          // Profile exists on blockchain, fetch and save to localStorage
+          const profileData = await getHospitalProfileFromChain(account.address);
+          if (profileData) {
+            const hospitalData: HospitalData = {
+              name: profileData.name,
+              type: profileData.hospitalType as HospitalData["type"],
+              licenseNumber: profileData.licenseNumber,
+              address: profileData.physicalAddress,
+              city: profileData.city,
+              phone: profileData.phone,
+              picName: profileData.picName,
+              picPosition: profileData.picPosition,
+              picPhone: profileData.picPhone,
+              picEmail: profileData.picEmail,
+              walletAddress: account.address,
+              registeredAt: new Date(profileData.createdAt * 1000).toISOString(),
+            };
+            saveHospitalData(hospitalData);
+            router.push("/dashboard/hospital");
+          }
+        }
+      } catch (error) {
+        console.error("Error checking blockchain profile:", error);
+      }
+    };
     
-    // If already registered, redirect to dashboard
-    if (isHospitalRegistered(account.address)) {
-      router.push("/dashboard/hospital");
-    }
+    checkRegistration();
   }, [account, router]);
 
   if (!account) {
@@ -143,21 +202,69 @@ export default function HospitalRegistration() {
     setSubmitError(null);
 
     try {
-      // Step 1: Whitelist hospital on blockchain
-      const whitelistResult = await whitelistHospitalOnChain(
+      // Step 1: Get signature from backend for AutomatedHospitalRegistry
+      console.log("Getting registration signature from backend...");
+      const signatureResult = await getRegistrationSignature(
         account.address,
-        formData.name
+        formData.name,
+        formData.licenseNumber
       );
 
-      if (!whitelistResult.success) {
-        throw new Error(whitelistResult.error || "Failed to register on blockchain");
+      if (!signatureResult.success || !signatureResult.signature) {
+        throw new Error(signatureResult.error || "Failed to get registration signature");
       }
 
-      if (whitelistResult.txHash) {
-        setTxHash(whitelistResult.txHash);
+      // Step 2: Register in AutomatedHospitalRegistry (from user's wallet)
+      console.log("Registering hospital in AutomatedHospitalRegistry...");
+      const registryResult = await registerHospitalInRegistry(
+        account,
+        formData.name,
+        formData.licenseNumber,
+        signatureResult.signature
+      );
+
+      if (!registryResult.success) {
+        // Check if already registered
+        const existingDetails = await getHospitalDetailsFromRegistry(account.address);
+        if (!existingDetails) {
+          throw new Error(registryResult.error || "Failed to register in hospital registry");
+        }
+        console.log("Hospital already registered in registry");
+      } else {
+        console.log("Registry TX:", registryResult.txHash);
+        setTxHash(registryResult.txHash || null);
       }
 
-      // Step 2: Save to localStorage
+      // Step 3: Whitelist hospital in MedichainPatientIdentity (for patient access)
+      console.log("Whitelisting hospital for patient access...");
+      const whitelistResult = await whitelistHospitalOnChain(account.address, formData.name);
+      if (!whitelistResult.success && !whitelistResult.error?.includes("already")) {
+        console.warn("Whitelist warning:", whitelistResult.error);
+        // Don't throw - continue with profile setup
+      }
+
+      // Step 4: Set hospital profile in MedichainHospitalProfile
+      console.log("Setting hospital profile on blockchain...");
+      const profileResult = await setHospitalProfile(
+        account,
+        formData.type,
+        formData.address,
+        formData.city,
+        formData.phone,
+        formData.picName,
+        formData.picPosition || "",
+        formData.picPhone,
+        formData.picEmail
+      );
+
+      if (!profileResult.success) {
+        console.warn("Profile setup warning:", profileResult.error);
+        // Don't throw - localStorage backup will still work
+      } else {
+        console.log("Profile TX:", profileResult.txHash);
+      }
+
+      // Step 5: Save to localStorage (backup)
       const hospitalData: HospitalData = {
         name: formData.name,
         type: formData.type as HospitalData["type"],
