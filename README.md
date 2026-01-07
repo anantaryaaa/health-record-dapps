@@ -236,7 +236,7 @@ ERC2771 meta-transaction forwarder enabling gasless transactions.
 - **Runtime:** Node.js with Next.js API routes
 - **Blockchain:** Viem for contract interactions
 - **IPFS:** Pinata for medical record storage
-- **AI/ML:** Google Gemini 2.0 Flash for OCR
+- **AI/ML:** Google Gemini 3 Flash for OCR
 - **Authentication:** Wallet-based (no traditional auth)
 
 ### Smart Contracts
