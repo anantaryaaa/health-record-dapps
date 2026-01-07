@@ -106,7 +106,7 @@ export function LandingHeroHospital() {
           </motion.div>
 
           <Image
-            src="/landing-hero-hospitals.png"
+            src="/assets/landing-hero-hospitals.webp"
             alt="Hospital Healthcare"
             width={900}
             height={900}

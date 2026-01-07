@@ -2,14 +2,21 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { SiNextdotjs, SiIpfs, SiThirdweb } from "react-icons/si"
-import { RiNftFill } from "react-icons/ri"
+import { SiNextdotjs, SiThirdweb } from "react-icons/si"
 import { GiPinata } from "react-icons/gi"
+import { NetworkLisk } from "@web3icons/react"
 
-const techStacks = [
+interface TechItem {
+  name: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
+  isWeb3Icon?: boolean;
+}
+
+const techStacks: TechItem[] = [
   { name: "Next.js", description: "High-performance React framework for scalable web applications", icon: SiNextdotjs },
   { name: "Thirdweb", description: "Web3 SDK for Wallets & Smart Contracts", icon: SiThirdweb },
-  { name: "Lisk Sepolia", description: "Layer 2 network for scalable transactions", icon: RiNftFill },
+  { name: "Lisk Sepolia", description: "Layer 2 network for scalable transactions", icon: NetworkLisk, isWeb3Icon: true },
   { name: "Pinata IPFS", description: "Secure decentralized storage ensuring immutable data availability", icon: GiPinata },
 ]
 
@@ -114,9 +121,16 @@ export function TechStack({ activeTab }: TechStackProps) {
                       <div className={`p-2.5 flex-shrink-0 rounded-xl ${
                         isPatient ? "bg-primary/10" : "bg-teal-500/10"
                       }`}>
-                        <tech.icon className={`w-8 h-8 ${
-                          isPatient ? "text-primary" : "text-teal-600"
-                        }`} />
+                        {tech.isWeb3Icon ? (
+                          <tech.icon 
+                            size={32}
+                            className={isPatient ? "text-primary" : "text-teal-600"}
+                          />
+                        ) : (
+                          <tech.icon className={`w-8 h-8 ${
+                            isPatient ? "text-primary" : "text-teal-600"
+                          }`} />
+                        )}
                       </div>
                       
                       {/* Text */}

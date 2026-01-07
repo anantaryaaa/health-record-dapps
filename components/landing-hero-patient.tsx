@@ -105,7 +105,7 @@ export function LandingHeroPatient() {
           </motion.div>
 
           <Image
-            src="/landing-hero-patient.jpg"
+            src="/assets/landing-hero-patient.webp"
             alt="Patient Healthcare"
             width={900}
             height={900}

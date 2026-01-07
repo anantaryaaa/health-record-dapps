@@ -1312,11 +1312,16 @@ function OCRUploadSection({
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Reset states
+    setOcrError(null);
+    setIsComplete(false);
 
     // Show preview
     const reader = new FileReader();
@@ -1325,35 +1330,59 @@ function OCRUploadSection({
     };
     reader.readAsDataURL(file);
 
-    // Simulate OCR processing
+    // Process with Gemini OCR API
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Mock OCR result - in production this would call Tesseract.js or an API
-    const mockResult: MedicalRecordInput = {
-      noRekamMedik: "MR-2024-00123",
-      tanggalMasuk: new Date().toISOString().split('T')[0],
-      tanggalKeluar: "",
-      diagnosisUtama: "Acute Bronchitis",
-      icdCode: "J20.9",
-      diagnosisSekunder: "",
-      keluhan: "Productive cough for 5 days, mild fever 37.8°C, mild shortness of breath, chest pain when coughing",
-      riwayatAlergi: "None",
-      tindakan: "Physical examination, Chest X-ray",
-      resepObat: "Ambroxol 30mg 3x1, Salbutamol 2mg 3x1, Paracetamol 500mg 3x1 (if fever)",
-      keadaanKeluar: "",
-      dokterPenanggungJawab: "Dr. Ahmad Pratama, Sp.P",
-    };
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
 
-    setIsProcessing(false);
-    setIsComplete(true);
-    onOCRComplete(mockResult);
+      const response = await fetch("/api/ocr", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "OCR processing failed");
+      }
+
+      if (result.success && result.data) {
+        // Map the extracted data to MedicalRecordInput format
+        const extractedData: MedicalRecordInput = {
+          noRekamMedik: result.data.noRekamMedik || "",
+          tanggalMasuk: result.data.tanggalMasuk || new Date().toISOString().split('T')[0],
+          tanggalKeluar: result.data.tanggalKeluar || "",
+          diagnosisUtama: result.data.diagnosisUtama || "",
+          icdCode: result.data.icdCode || "",
+          diagnosisSekunder: result.data.diagnosisSekunder || "",
+          keluhan: result.data.keluhan || "",
+          riwayatAlergi: result.data.riwayatAlergi || "",
+          tindakan: result.data.tindakan || "",
+          resepObat: result.data.resepObat || "",
+          keadaanKeluar: result.data.keadaanKeluar || "",
+          dokterPenanggungJawab: result.data.dokterPenanggungJawab || "",
+        };
+
+        setIsComplete(true);
+        onOCRComplete(extractedData);
+      } else {
+        throw new Error("No data extracted from image");
+      }
+    } catch (error) {
+      console.error("OCR Error:", error);
+      setOcrError(error instanceof Error ? error.message : "Failed to process image");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleReset = () => {
     setUploadedImage(null);
     setIsProcessing(false);
     setIsComplete(false);
+    setOcrError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -1382,7 +1411,7 @@ function OCRUploadSection({
           </p>
           <div className="flex items-center gap-2 mt-4 text-xs text-teal-600">
             <Sparkles className="w-3 h-3" />
-            <span>Powered by OCR</span>
+            <span>Powered by AI</span>
           </div>
         </div>
       ) : (
@@ -1398,13 +1427,21 @@ function OCRUploadSection({
             {isProcessing && (
               <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
                 <Loader2 className="w-8 h-8 text-teal-400 animate-spin mb-2" />
-                <p className="text-white text-sm">Processing OCR...</p>
+                <p className="text-white text-sm">Analyzing with AI...</p>
+                <p className="text-white/70 text-xs mt-1">Extracting medical data...</p>
               </div>
             )}
-            {isComplete && (
+            {isComplete && !ocrError && (
               <div className="absolute inset-0 bg-emerald-600/80 flex flex-col items-center justify-center">
                 <FileCheck className="w-10 h-10 text-white mb-2" />
                 <p className="text-white font-semibold">Auto-fill Successful!</p>
+              </div>
+            )}
+            {ocrError && (
+              <div className="absolute inset-0 bg-red-600/80 flex flex-col items-center justify-center p-4">
+                <AlertCircle className="w-10 h-10 text-white mb-2" />
+                <p className="text-white font-semibold text-center">Extraction Failed</p>
+                <p className="text-white/80 text-xs text-center mt-1">{ocrError}</p>
               </div>
             )}
           </div>
@@ -1417,11 +1454,11 @@ function OCRUploadSection({
               onClick={handleReset}
               disabled={isProcessing}
             >
-              Re-upload
+              {ocrError ? "Try Again" : "Re-upload"}
             </Button>
           </div>
 
-          {isComplete && (
+          {isComplete && !ocrError && (
             <p className="text-xs text-center text-emerald-600">
               ✓ Data extracted successfully. Please review and edit if needed.
             </p>
