@@ -18,10 +18,17 @@ import {
   Stethoscope,
   FileText,
   AlertCircle,
-  Send
+  Send,
+  RefreshCw,
+  Printer,
+  Calendar,
+  Building2,
+  User,
+  FlaskConical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { isHospitalRegistered, getHospitalData } from "@/lib/hospitalStorage";
 import { 
   requestPatientAccess, 
@@ -42,6 +49,29 @@ interface ScannedPatientData {
   gender: string;
   age: number;
   bloodType: string;
+}
+
+// Medical record type for hospital view
+interface HospitalMedicalRecord {
+  id: number;
+  ipfsCid: string;
+  noRekamMedik: string;
+  tanggalMasuk: string;
+  tanggalKeluar: string;
+  diagnosisUtama: string;
+  icdCode: string;
+  diagnosisSekunder: string;
+  keluhan: string;
+  riwayatAlergi: string;
+  tindakan: string;
+  resepObat: string;
+  keadaanKeluar: string;
+  dokterPenanggungJawab: string;
+  hospital: string;
+  hospitalAddress: string;
+  category: "Diagnose" | "Lab";
+  timestamp: number;
+  isVerified: boolean;
 }
 
 interface MedicalRecordInput {
@@ -93,6 +123,8 @@ export default function HospitalDashboard() {
   const [showScanner, setShowScanner] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState(0);
   
   // Hospital data
   const hospitalData = account ? getHospitalData(account.address) : null;
@@ -179,8 +211,26 @@ export default function HospitalDashboard() {
       
       console.log("Blockchain transaction successful:", blockchainResult.txHash);
       
-      // Success!
-      setCurrentStep("success");
+      // Success! Stay on input page, reset form, show toast, and refresh history
+      setMedicalRecord({
+        noRekamMedik: "",
+        tanggalMasuk: new Date().toISOString().split('T')[0],
+        tanggalKeluar: "",
+        diagnosisUtama: "",
+        icdCode: "",
+        diagnosisSekunder: "",
+        keluhan: "",
+        riwayatAlergi: "",
+        tindakan: "",
+        resepObat: "",
+        keadaanKeluar: "",
+        dokterPenanggungJawab: "",
+      });
+      setShowSuccessToast(true);
+      setRefreshHistoryTrigger(prev => prev + 1); // Trigger history refresh
+      
+      // Auto-hide toast after 5 seconds
+      setTimeout(() => setShowSuccessToast(false), 5000);
     } catch (error) {
       console.error("Error submitting medical record:", error);
       setSubmitError(error instanceof Error ? error.message : "Failed to submit record");
@@ -234,6 +284,22 @@ export default function HospitalDashboard() {
         </div>
       </header>
 
+      {/* Success Toast */}
+      {showSuccessToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-3 bg-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg">
+            <CheckCircle2 className="w-5 h-5" />
+            <span className="font-medium">Medical record saved successfully!</span>
+            <button 
+              onClick={() => setShowSuccessToast(false)}
+              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="max-w-6xl mx-auto p-6">
         {currentStep === "search" && (
@@ -255,11 +321,16 @@ export default function HospitalDashboard() {
             onBack={() => setCurrentStep("search")}
             isSubmitting={isSubmitting}
             submitError={submitError}
+            refreshHistoryTrigger={refreshHistoryTrigger}
           />
         )}
 
-        {currentStep === "success" && (
-          <SuccessStep onReset={handleReset} />
+        {currentStep === "success" && patient && (
+          <SuccessStep 
+            onReset={handleReset} 
+            patient={patient}
+            medicalRecord={medicalRecord}
+          />
         )}
       </main>
     </div>
@@ -397,6 +468,7 @@ function InputRecordStep({
   onBack,
   isSubmitting = false,
   submitError = null,
+  refreshHistoryTrigger = 0,
 }: {
   patient: ScannedPatientData;
   medicalRecord: MedicalRecordInput;
@@ -405,88 +477,259 @@ function InputRecordStep({
   onBack: () => void;
   isSubmitting?: boolean;
   submitError?: string | null;
+  refreshHistoryTrigger?: number;
 }) {
   const [activeTab, setActiveTab] = useState<"history" | "new">("history");
-  const [medicalHistory, setMedicalHistory] = useState<Array<{
-    date: string;
-    diagnosis: string;
-    symptoms: string;
-    treatment: string;
-    hospital: string;
-    icdCode: string;
-    isVerified: boolean;
-  }>>([]);
+  const [medicalHistory, setMedicalHistory] = useState<HospitalMedicalRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<HospitalMedicalRecord | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
   
   const isFormValid = medicalRecord.diagnosisUtama && medicalRecord.keluhan && medicalRecord.dokterPenanggungJawab;
+  const categories = ["All", "Diagnose", "Lab"];
+
+  // Print single record as PDF
+  const handlePrintRecord = (record: HospitalMedicalRecord) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Medical Record - ${patient.name}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: system-ui, -apple-system, sans-serif;
+              padding: 24px;
+              background: #fff;
+              color: #1a1a1a;
+              font-size: 12px;
+            }
+            .container {
+              max-width: 800px;
+              margin: 0 auto;
+              border: 2px solid #333;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 16px 20px;
+              border-bottom: 2px solid #333;
+              background: linear-gradient(135deg, #0077C0, #005a94);
+              color: white;
+            }
+            .logo h1 { font-size: 18px; font-weight: bold; }
+            .logo p { font-size: 10px; opacity: 0.8; }
+            .badge {
+              background: #C7EEFF;
+              color: #0077C0;
+              padding: 4px 12px;
+              border-radius: 4px;
+              font-size: 10px;
+              font-weight: 600;
+            }
+            .title-bar {
+              text-align: center;
+              padding: 12px;
+              border-bottom: 1px solid #333;
+              background: #f5f5f5;
+            }
+            .title-bar h2 { font-size: 14px; font-weight: bold; }
+            .content { padding: 0; }
+            .row { display: flex; border-bottom: 1px solid #ddd; }
+            .row:last-child { border-bottom: none; }
+            .cell { padding: 8px 12px; border-right: 1px solid #ddd; flex: 1; }
+            .cell:last-child { border-right: none; }
+            .cell.label {
+              background: #f9f9f9;
+              font-weight: 600;
+              flex: 0 0 160px;
+              font-size: 11px;
+              color: #555;
+            }
+            .section-title {
+              background: #e8e8e8;
+              padding: 8px 12px;
+              font-weight: bold;
+              font-size: 12px;
+              border-bottom: 1px solid #ddd;
+            }
+            .patient-info { display: grid; grid-template-columns: 1fr 1fr; }
+            .patient-info .cell { padding: 6px 12px; }
+            .footer {
+              padding: 12px;
+              background: #f5f5f5;
+              border-top: 2px solid #333;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .footer .date { font-size: 10px; color: #666; }
+            .footer .signature { text-align: center; }
+            .footer .signature .line {
+              width: 150px;
+              border-bottom: 1px solid #333;
+              margin-bottom: 4px;
+              height: 40px;
+            }
+            .footer .signature p { font-size: 10px; }
+            @media print { body { padding: 0; } .container { border: 1px solid #333; } }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">
+                <h1>MEDICHAIN</h1>
+                <p>Decentralized Health Record</p>
+              </div>
+              <span class="badge">MEDICAL RECORD</span>
+            </div>
+            <div class="title-bar"><h2>MEDICAL RECORD FORM</h2></div>
+            <div class="content">
+              <div class="section-title">PATIENT DATA</div>
+              <div class="patient-info">
+                <div class="row"><div class="cell label">Patient Name</div><div class="cell value">${patient.name}</div></div>
+                <div class="row"><div class="cell label">ID Number</div><div class="cell value">${patient.nik}</div></div>
+                <div class="row"><div class="cell label">Gender</div><div class="cell value">${patient.gender}</div></div>
+                <div class="row"><div class="cell label">Age</div><div class="cell value">${patient.age} Years</div></div>
+                <div class="row"><div class="cell label">Blood Type</div><div class="cell value">${patient.bloodType}</div></div>
+                <div class="row"><div class="cell label">Allergy History</div><div class="cell value">${record.riwayatAlergi || "-"}</div></div>
+              </div>
+              <div class="section-title">VISIT DATA</div>
+              <div class="row"><div class="cell label">Medical Record No.</div><div class="cell value">${record.noRekamMedik}</div></div>
+              <div class="row"><div class="cell label">Admission Date</div><div class="cell value">${record.tanggalMasuk}</div></div>
+              <div class="row"><div class="cell label">Discharge Date</div><div class="cell value">${record.tanggalKeluar || "-"}</div></div>
+              <div class="row"><div class="cell label">Healthcare Facility</div><div class="cell value">${record.hospital}</div></div>
+              <div class="section-title">DIAGNOSIS</div>
+              <div class="row"><div class="cell label">Primary Diagnosis</div><div class="cell value">${record.diagnosisUtama}</div></div>
+              <div class="row"><div class="cell label">ICD-X Code</div><div class="cell value">${record.icdCode || "-"}</div></div>
+              <div class="row"><div class="cell label">Secondary Diagnosis</div><div class="cell value">${record.diagnosisSekunder || "-"}</div></div>
+              <div class="section-title">CLINICAL DATA</div>
+              <div class="row"><div class="cell label">Symptoms / Complaints</div><div class="cell value">${record.keluhan}</div></div>
+              <div class="row"><div class="cell label">Procedure</div><div class="cell value">${record.tindakan || "-"}</div></div>
+              <div class="row"><div class="cell label">Prescription / Therapy</div><div class="cell value">${record.resepObat || "-"}</div></div>
+              <div class="section-title">VISIT OUTCOME</div>
+              <div class="row"><div class="cell label">Discharge Status</div><div class="cell value">${record.keadaanKeluar || "-"}</div></div>
+              <div class="row"><div class="cell label">Attending Physician</div><div class="cell value">${record.dokterPenanggungJawab}</div></div>
+            </div>
+            <div class="footer">
+              <div class="date">Printed: ${new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+              <div class="signature"><div class="line"></div><p>Doctor's Signature</p></div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); }, 250);
+  };
 
   // Fetch medical history from blockchain + IPFS
-  useEffect(() => {
-    const fetchHistory = async () => {
-      if (!patient.walletAddress) return;
-      
-      setIsLoadingHistory(true);
-      setHistoryError(null);
-      
-      try {
-        // Get records from blockchain
-        const recordRefs = await getPatientRecords(patient.walletAddress);
-        
-        if (recordRefs.length === 0) {
-          setMedicalHistory([]);
-          setIsLoadingHistory(false);
-          return;
-        }
-        
-        // Fetch and decrypt each record from IPFS
-        const history: typeof medicalHistory = [];
-        
-        for (const ref of recordRefs) {
-          try {
-            const ipfsResult = await getMedicalRecord(ref.ipfsCid, patient.walletAddress);
-            
-            if (ipfsResult.success && ipfsResult.data) {
-              history.push({
-                date: ipfsResult.data.tanggalMasuk || new Date(ref.timestamp * 1000).toLocaleDateString(),
-                diagnosis: ipfsResult.data.diagnosisUtama || ref.icd10Code,
-                symptoms: ipfsResult.data.keluhan || "",
-                treatment: ipfsResult.data.resepObat || "",
-                hospital: ipfsResult.data.hospitalName || `Hospital ${ref.hospitalAddress.slice(0, 8)}...`,
-                icdCode: ref.icd10Code,
-                isVerified: ref.isVerified,
-              });
-            } else {
-              // Fallback with blockchain data only
-              history.push({
-                date: new Date(ref.timestamp * 1000).toLocaleDateString(),
-                diagnosis: ref.icd10Code,
-                symptoms: "(Encrypted)",
-                treatment: "(Encrypted)",
-                hospital: `Hospital ${ref.hospitalAddress.slice(0, 8)}...`,
-                icdCode: ref.icd10Code,
-                isVerified: ref.isVerified,
-              });
-            }
-          } catch (err) {
-            console.error("Failed to decrypt record:", err);
-          }
-        }
-        
-        // Sort by date descending
-        history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        
-        setMedicalHistory(history);
-      } catch (err) {
-        console.error("Error fetching medical history:", err);
-        setHistoryError("Failed to load medical history");
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    };
+  const fetchHistory = async () => {
+    if (!patient.walletAddress) return;
     
+    setIsLoadingHistory(true);
+    setHistoryError(null);
+    
+    try {
+      const recordRefs = await getPatientRecords(patient.walletAddress);
+      
+      if (recordRefs.length === 0) {
+        setMedicalHistory([]);
+        setIsLoadingHistory(false);
+        return;
+      }
+      
+      const history: HospitalMedicalRecord[] = [];
+      
+      for (let i = 0; i < recordRefs.length; i++) {
+        const ref = recordRefs[i];
+        try {
+          const ipfsResult = await getMedicalRecord(ref.ipfsCid, patient.walletAddress);
+          
+          if (ipfsResult.success && ipfsResult.data) {
+            history.push({
+              id: i + 1,
+              ipfsCid: ref.ipfsCid,
+              noRekamMedik: ipfsResult.data.noRekamMedik || `MR-${ref.timestamp}`,
+              tanggalMasuk: ipfsResult.data.tanggalMasuk || new Date(ref.timestamp * 1000).toLocaleDateString(),
+              tanggalKeluar: ipfsResult.data.tanggalKeluar || "",
+              diagnosisUtama: ipfsResult.data.diagnosisUtama || ref.icd10Code,
+              icdCode: ipfsResult.data.icdCode || ref.icd10Code,
+              diagnosisSekunder: ipfsResult.data.diagnosisSekunder || "",
+              keluhan: ipfsResult.data.keluhan || "",
+              riwayatAlergi: ipfsResult.data.riwayatAlergi || "",
+              tindakan: ipfsResult.data.tindakan || "",
+              resepObat: ipfsResult.data.resepObat || "",
+              keadaanKeluar: ipfsResult.data.keadaanKeluar || "",
+              dokterPenanggungJawab: ipfsResult.data.dokterPenanggungJawab || "",
+              hospital: ipfsResult.data.hospitalName || `Hospital ${ref.hospitalAddress.slice(0, 8)}...`,
+              hospitalAddress: ref.hospitalAddress,
+              category: ref.recordType === "Lab" ? "Lab" : "Diagnose",
+              timestamp: ref.timestamp,
+              isVerified: ref.isVerified,
+            });
+          } else {
+            history.push({
+              id: i + 1,
+              ipfsCid: ref.ipfsCid,
+              noRekamMedik: `MR-${ref.timestamp}`,
+              tanggalMasuk: new Date(ref.timestamp * 1000).toLocaleDateString(),
+              tanggalKeluar: "",
+              diagnosisUtama: ref.icd10Code,
+              icdCode: ref.icd10Code,
+              diagnosisSekunder: "",
+              keluhan: "(Encrypted)",
+              riwayatAlergi: "",
+              tindakan: "",
+              resepObat: "(Encrypted)",
+              keadaanKeluar: "",
+              dokterPenanggungJawab: "",
+              hospital: `Hospital ${ref.hospitalAddress.slice(0, 8)}...`,
+              hospitalAddress: ref.hospitalAddress,
+              category: ref.recordType === "Lab" ? "Lab" : "Diagnose",
+              timestamp: ref.timestamp,
+              isVerified: ref.isVerified,
+            });
+          }
+        } catch (err) {
+          console.error("Failed to decrypt record:", err);
+        }
+      }
+      
+      history.sort((a, b) => b.timestamp - a.timestamp);
+      setMedicalHistory(history);
+    } catch (err) {
+      console.error("Error fetching medical history:", err);
+      setHistoryError("Failed to load medical history");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
     fetchHistory();
-  }, [patient.walletAddress]);
+  }, [patient.walletAddress, refreshHistoryTrigger]);
+
+  // Filter records
+  const filteredRecords = medicalHistory.filter(record => {
+    const matchesSearch = 
+      record.diagnosisUtama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.keluhan.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.hospital.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.dokterPenanggungJawab.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesCategory = selectedCategory === "All" || record.category === selectedCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <div className="py-6">
@@ -583,8 +826,65 @@ function InputRecordStep({
             </div>
 
             {activeTab === "history" ? (
-              /* Medical History */
+              /* Medical History - Complete View */
               <div className="space-y-4">
+                {/* Header with Refresh */}
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-semibold text-foreground">Medical History</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {filteredRecords.length} record{filteredRecords.length !== 1 ? 's' : ''} found
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchHistory}
+                    disabled={isLoadingHistory}
+                    className="gap-2"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isLoadingHistory ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
+
+                {/* Search & Filter */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search records..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 bg-muted/30"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`px-3 py-2 text-xs font-medium rounded-lg transition-all ${
+                          selectedCategory === cat
+                            ? "bg-teal-500 text-white"
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {isLoadingHistory ? (
                   <div className="text-center py-12">
                     <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -594,55 +894,92 @@ function InputRecordStep({
                   <div className="text-center py-12 text-red-500">
                     <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p>{historyError}</p>
+                    <Button variant="outline" size="sm" onClick={fetchHistory} className="mt-3">
+                      Try Again
+                    </Button>
                   </div>
-                ) : medicalHistory.length > 0 ? (
-                  medicalHistory.map((record, index) => (
-                    <div key={index} className="p-4 bg-muted/30 border border-border rounded-xl">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">{record.date}</span>
-                            {record.icdCode && (
-                              <span className="text-xs px-1.5 py-0.5 bg-blue-500/10 text-blue-600 rounded font-mono">
-                                {record.icdCode}
+                ) : filteredRecords.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredRecords.map((record) => (
+                      <Card 
+                        key={record.id} 
+                        className="group hover:shadow-lg hover:border-teal-500/30 transition-all duration-300 cursor-pointer overflow-hidden"
+                        onClick={() => setSelectedRecord(record)}
+                      >
+                        <CardContent className="p-0">
+                          {/* Category Color Bar */}
+                          <div className={`h-1.5 ${
+                            record.category === "Diagnose" ? "bg-blue-500" : "bg-emerald-500"
+                          }`} />
+                          
+                          <div className="p-4">
+                            {/* Date & Verification */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Calendar className="w-3 h-3" />
+                                {record.tanggalMasuk}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {record.isVerified && (
+                                  <span title="Verified on blockchain">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-green-500" />
+                                  </span>
+                                )}
+                                <span className="text-xs font-mono text-muted-foreground">
+                                  {record.noRekamMedik}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Title */}
+                            <h4 className="font-bold text-foreground mb-2 group-hover:text-teal-600 transition-colors line-clamp-1">
+                              {record.diagnosisUtama}
+                            </h4>
+
+                            {/* Category & Status */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${
+                                record.category === "Diagnose" 
+                                  ? "bg-blue-500/10 text-blue-600" 
+                                  : "bg-emerald-500/10 text-emerald-600"
+                              }`}>
+                                {record.category === "Diagnose" ? <Stethoscope className="w-3 h-3" /> : <FlaskConical className="w-3 h-3" />}
+                                {record.category}
                               </span>
-                            )}
+                              {record.icdCode && (
+                                <span className="text-xs px-2 py-0.5 bg-purple-500/10 text-purple-600 rounded font-mono">
+                                  {record.icdCode}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Preview */}
+                            <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+                              {record.keluhan}
+                            </p>
+
+                            {/* Footer */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t border-border">
+                              <Building2 className="w-3 h-3 text-teal-600" />
+                              <span className="truncate">{record.hospital}</span>
+                            </div>
                           </div>
-                          <h4 className="font-semibold text-foreground mt-1">{record.diagnosis}</h4>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {record.isVerified && (
-                            <span title="Verified on blockchain" className="text-emerald-500">
-                              <ShieldCheck className="w-4 h-4" />
-                            </span>
-                          )}
-                          <span className="text-xs px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-medium">
-                            Complete
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">Symptoms</p>
-                          <p className="text-sm text-foreground">{record.symptoms}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">Treatment</p>
-                          <p className="text-sm text-foreground">{record.treatment}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <ShieldCheck className="w-3 h-3 text-teal-600" />
-                        {record.hospital}
-                      </div>
-                    </div>
-                  ))
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
                     <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No medical history yet</p>
+                    <p>{searchQuery || selectedCategory !== "All" ? "No matching records" : "No medical history yet"}</p>
+                    {(searchQuery || selectedCategory !== "All") && (
+                      <button
+                        onClick={() => { setSearchQuery(""); setSelectedCategory("All"); }}
+                        className="mt-2 text-sm text-teal-600 hover:underline"
+                      >
+                        Clear filters
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -832,6 +1169,134 @@ function InputRecordStep({
           </CardContent>
         </Card>
       </div>
+
+      {/* Record Detail Modal */}
+      {selectedRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedRecord(null)}>
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <CardContent className="p-0">
+              {/* Modal Header */}
+              <div className={`p-6 ${
+                selectedRecord.category === "Diagnose" 
+                  ? "bg-gradient-to-r from-blue-500/20 to-blue-500/5" 
+                  : "bg-gradient-to-r from-emerald-500/20 to-emerald-500/5"
+              }`}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                      <span className="font-mono">{selectedRecord.noRekamMedik}</span>
+                      <span>•</span>
+                      <span>{selectedRecord.tanggalMasuk}</span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-foreground">{selectedRecord.diagnosisUtama}</h2>
+                    <p className="text-sm text-muted-foreground mt-1">ICD: {selectedRecord.icdCode || "-"}</p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md font-medium ${
+                        selectedRecord.category === "Diagnose" 
+                          ? "bg-blue-500/20 text-blue-600" 
+                          : "bg-emerald-500/20 text-emerald-600"
+                      }`}>
+                        {selectedRecord.category === "Diagnose" ? <Stethoscope className="w-3 h-3" /> : <FlaskConical className="w-3 h-3" />}
+                        {selectedRecord.category}
+                      </span>
+                      {selectedRecord.keadaanKeluar && (
+                        <span className="text-xs px-2 py-1 bg-emerald-500/20 text-emerald-600 rounded-md font-medium capitalize">
+                          {selectedRecord.keadaanKeluar}
+                        </span>
+                      )}
+                      {selectedRecord.isVerified && (
+                        <span className="flex items-center gap-1 text-xs text-green-600">
+                          <ShieldCheck className="w-3 h-3" />
+                          Verified
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedRecord(null)} className="p-2 rounded-full hover:bg-muted/50 transition-colors">
+                    <X className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-5">
+                {/* Keluhan */}
+                <div>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Symptoms / Complaints
+                  </h4>
+                  <p className="text-foreground">{selectedRecord.keluhan || "-"}</p>
+                </div>
+
+                {/* Riwayat Alergi */}
+                {selectedRecord.riwayatAlergi && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Allergy History
+                    </h4>
+                    <p className="text-foreground">{selectedRecord.riwayatAlergi}</p>
+                  </div>
+                )}
+
+                {/* Diagnosis Sekunder */}
+                {selectedRecord.diagnosisSekunder && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Secondary Diagnosis
+                    </h4>
+                    <p className="text-foreground">{selectedRecord.diagnosisSekunder}</p>
+                  </div>
+                )}
+
+                {/* Tindakan */}
+                {selectedRecord.tindakan && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Procedure
+                    </h4>
+                    <p className="text-foreground">{selectedRecord.tindakan}</p>
+                  </div>
+                )}
+
+                {/* Resep */}
+                <div>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Prescription / Therapy
+                  </h4>
+                  <p className="text-foreground">{selectedRecord.resepObat || "-"}</p>
+                </div>
+
+                {/* Footer Info */}
+                <div className="pt-4 border-t border-border space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Building2 className="w-4 h-4 text-teal-600" />
+                    {selectedRecord.hospital}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <User className="w-4 h-4 text-teal-600" />
+                    {selectedRecord.dokterPenanggungJawab || "-"}
+                  </div>
+                  {selectedRecord.tanggalKeluar && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="w-4 h-4 text-teal-600" />
+                      Discharge: {selectedRecord.tanggalKeluar}
+                    </div>
+                  )}
+                </div>
+
+                {/* Print Button */}
+                <Button
+                  onClick={() => handlePrintRecord(selectedRecord)}
+                  className="w-full gap-2 mt-4 bg-teal-600 hover:bg-teal-700"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print Medical Record
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
@@ -967,29 +1432,94 @@ function OCRUploadSection({
   );
 }
 
-// Step 3: Success
-function SuccessStep({ onReset }: { onReset: () => void }) {
+// Step 3: Success - Show submitted data review
+function SuccessStep({ 
+  onReset,
+  patient,
+  medicalRecord 
+}: { 
+  onReset: () => void;
+  patient: ScannedPatientData;
+  medicalRecord: MedicalRecordInput;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-      <div className="w-full max-w-md text-center">
-        {/* Success Icon */}
-        <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle2 className="w-10 h-10 text-white" />
+    <div className="py-6">
+      {/* Success Header */}
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle2 className="w-8 h-8 text-white" />
         </div>
-
-        {/* Title */}
-        <h1 className="text-3xl font-bold text-foreground mb-3">
-          Data Saved Successfully!
+        <h1 className="text-2xl font-bold text-foreground mb-2">
+          Medical Record Saved!
         </h1>
-        <p className="text-muted-foreground mb-8">
-          Data has been encrypted and sent to the Patient&apos;s Wallet. Full access rights are now in the patient&apos;s hands.
+        <p className="text-muted-foreground">
+          Data has been encrypted and stored on IPFS. Record is now on blockchain.
         </p>
+      </div>
 
-        {/* Back Button */}
+      {/* Submitted Data Review */}
+      <Card className="max-w-3xl mx-auto mb-6">
+        <CardContent className="p-6">
+          {/* Patient Info Header */}
+          <div className="flex items-center gap-4 pb-4 mb-4 border-b border-border">
+            <div className="w-12 h-12 bg-teal-500/10 rounded-xl flex items-center justify-center text-lg font-bold text-teal-600">
+              {patient.name.charAt(0)}
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">{patient.name}</h3>
+              <p className="text-sm text-muted-foreground font-mono">{patient.nik}</p>
+            </div>
+            <div className="ml-auto flex items-center gap-2 text-emerald-600">
+              <ShieldCheck className="w-4 h-4" />
+              <span className="text-sm font-medium">Verified & Saved</span>
+            </div>
+          </div>
+
+          {/* Record Details */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Medical Record No.</p>
+              <p className="text-sm font-medium text-foreground">{medicalRecord.noRekamMedik || "-"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Visit Date</p>
+              <p className="text-sm font-medium text-foreground">{medicalRecord.tanggalMasuk || "-"}</p>
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-xs text-muted-foreground mb-1">Primary Diagnosis</p>
+              <p className="text-sm font-medium text-foreground">{medicalRecord.diagnosisUtama || "-"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">ICD-10 Code</p>
+              <p className="text-sm font-medium text-foreground font-mono">{medicalRecord.icdCode || "-"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Discharge Status</p>
+              <p className="text-sm font-medium text-foreground capitalize">{medicalRecord.keadaanKeluar || "-"}</p>
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-xs text-muted-foreground mb-1">Symptoms/Complaints</p>
+              <p className="text-sm text-foreground">{medicalRecord.keluhan || "-"}</p>
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-xs text-muted-foreground mb-1">Treatment/Prescription</p>
+              <p className="text-sm text-foreground">{medicalRecord.resepObat || "-"}</p>
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-xs text-muted-foreground mb-1">Attending Physician</p>
+              <p className="text-sm font-medium text-foreground">{medicalRecord.dokterPenanggungJawab || "-"}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Back Button */}
+      <div className="max-w-3xl mx-auto">
         <Button
           onClick={onReset}
-          className="w-full h-14 gap-2 bg-gradient-to-r from-teal-600 to-teal-500 text-lg font-semibold hover:from-teal-700 hover:to-teal-600"
+          className="w-full h-12 gap-2 bg-gradient-to-r from-teal-600 to-teal-500 text-base font-semibold hover:from-teal-700 hover:to-teal-600"
         >
+          <ArrowLeft className="w-4 h-4" />
           Back to Main Menu
         </Button>
       </div>
@@ -1013,6 +1543,7 @@ function QRScannerModal({
   const [processing, setProcessing] = useState(false);
   const [scannedPatient, setScannedPatient] = useState<ScannedPatientData | null>(null);
   const [accessStatus, setAccessStatus] = useState<"none" | "checking" | "has_access" | "requesting" | "requested">("none");
+  const [isCheckingAgain, setIsCheckingAgain] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
   const [manualAddress, setManualAddress] = useState("");
   
@@ -1248,6 +1779,28 @@ function QRScannerModal({
     }
   };
 
+  const handleCheckAccessAgain = async () => {
+    if (!scannedPatient || !account) return;
+    
+    setIsCheckingAgain(true);
+    setError(null);
+    
+    try {
+      const accessResult = await checkAccess(scannedPatient.walletAddress, account.address);
+      if (accessResult.hasAccess) {
+        setAccessStatus("has_access");
+      } else {
+        // Still pending
+        setError("Access not yet approved. Please ask patient to approve the request.");
+      }
+    } catch (err) {
+      console.error("Error checking access:", err);
+      setError("Failed to check access status. Try again.");
+    } finally {
+      setIsCheckingAgain(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -1400,15 +1953,38 @@ function QRScannerModal({
         {/* Step 3: Access Request Sent */}
         {scannedPatient && accessStatus === "requested" && (
           <div className="text-center">
-            <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Send className="w-8 h-8 text-white" />
             </div>
             <h3 className="text-lg font-bold text-foreground mb-2">Request Sent!</h3>
-            <p className="text-sm text-muted-foreground mb-6">
-              The patient will receive a notification in their app. Once approved, you can proceed with adding medical records.
+            <p className="text-sm text-muted-foreground mb-2">
+              Waiting for patient approval...
             </p>
+            <p className="text-xs text-muted-foreground mb-6">
+              Ask the patient to check their Medichain app and approve your access request.
+            </p>
+            
+            {/* Refresh Button */}
+            <Button 
+              className="w-full gap-2 mb-3 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600"
+              onClick={handleCheckAccessAgain}
+              disabled={isCheckingAgain}
+            >
+              {isCheckingAgain ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Check Approval Status
+                </>
+              )}
+            </Button>
+            
             <Button variant="outline" className="w-full" onClick={onClose}>
-              Close
+              Close & Scan Later
             </Button>
           </div>
         )}

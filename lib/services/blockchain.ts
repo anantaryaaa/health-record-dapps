@@ -365,19 +365,30 @@ function parseContractError(error: unknown): string {
     return "An access request is already pending for this patient";
   }
   if (errorStr.includes("AccessRequestNotPending")) {
-    return "This access request is no longer pending";
+    return "This access request is no longer pending (may have been approved/rejected already)";
   }
   if (errorStr.includes("InvalidAccessRequestIndex")) {
-    return "Invalid access request";
+    return "Invalid access request index";
   }
   if (errorStr.includes("AccessNotGranted")) {
     return "Access has not been granted";
+  }
+  if (errorStr.includes("AccessControlUnauthorizedAccount") || errorStr.includes("0xc7c31690")) {
+    return "Unauthorized - you don't have permission for this action";
   }
   if (errorStr.includes("user rejected") || errorStr.includes("User rejected")) {
     return "Transaction was rejected by user";
   }
   if (errorStr.includes("insufficient funds")) {
     return "Insufficient funds for gas";
+  }
+  
+  // Check for hex error signatures from the contract
+  if (errorStr.includes("0x409622d3")) {
+    return "Hospital is not whitelisted in the system";
+  }
+  if (errorStr.includes("0xc7c31690")) {
+    return "Authorization error - please ensure you are connected with the correct wallet";
   }
   
   // Return original error message if no match
