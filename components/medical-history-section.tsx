@@ -449,7 +449,7 @@ export function MedicalHistorySection({ patientData }: MedicalHistorySectionProp
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-foreground">Medical History</h2>
-          <p className="text-sm text-muted-foreground">Records from blockchain & IPFS</p>
+          
         </div>
         <Button
           variant="outline"
