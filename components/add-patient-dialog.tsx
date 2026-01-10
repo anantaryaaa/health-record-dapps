@@ -82,11 +82,11 @@ export function AddPatientDialog() {
           </div>
           <div className="space-y-2">
             <label htmlFor="patientId" className="text-sm font-medium">
-              Patient ID (NIK)
+              Patient Government ID
             </label>
             <Input
               id="patientId"
-              placeholder="Enter national ID"
+              placeholder="Enter Government ID"
               required
             />
           </div>

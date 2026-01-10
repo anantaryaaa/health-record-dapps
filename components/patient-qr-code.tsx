@@ -33,7 +33,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
   // Format wallet address for display
   const shortAddress = `${patientData.walletAddress.slice(0, 6)}...${patientData.walletAddress.slice(-4)}`
   
-  // Censored NIK for display (show first 4 and last 2, mask the rest)
+  // Censored Government ID for display (show first 4 and last 2, mask the rest)
   const censoredNik = patientData.nik.length > 6 
     ? `${patientData.nik.slice(0, 4)}${'•'.repeat(patientData.nik.length - 6)}${patientData.nik.slice(-2)}`
     : patientData.nik
@@ -137,7 +137,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
               font-weight: bold;
               margin-bottom: 2px;
             }
-            .nik {
+            .gov-id {
               font-size: 9px;
               opacity: 0.8;
               font-family: monospace;
@@ -197,7 +197,7 @@ export function PatientQRCode({ patientData, isOpen, onClose }: PatientQRCodePro
               <div class="info-section">
                 <div>
                   <div class="patient-name">${patientData.name}</div>
-                  <div class="nik">${patientData.nik}</div>
+                  <div class="gov-id">${patientData.nik}</div>
                 </div>
                 <div class="stats">
                   <div class="stat">

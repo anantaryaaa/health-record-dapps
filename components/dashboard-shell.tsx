@@ -45,7 +45,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Menu className="w-5 h-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <span className="font-bold">MediChain</span>
+            <span className="font-bold"><span className="text-primary">Medi</span><span className="text-teal-600">Chain</span></span>
           </div>
         </div>
         <Button variant="ghost" size="icon" aria-label="Notifications">
@@ -75,7 +75,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">M</span>
             </div>
-            {!collapsed && <span className="font-semibold">MediChain</span>}
+            {!collapsed && <span className="font-semibold"><span className="text-primary">Medi</span><span className="text-teal-600">Chain</span></span>}
           </div>
         </div>
 

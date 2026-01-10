@@ -368,7 +368,7 @@ medichain/
 
 ```
 1. Patient visits landing page
-2. Connects wallet (MetaMask)
+2. Patient connects
 3. Checks if already registered on blockchain
    - If yes: Shows "Sync Your Profile" form (no minting)
    - If no: Shows registration form with minting

@@ -50,11 +50,10 @@ export function Footer({ activeTab = "patient" }: FooterProps) {
           {/* Brand Column */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-3 mb-4">
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradientClass} flex items-center justify-center`}>
-                <Shield className="w-5 h-5 text-white" />
-              </div>
-              <span className={`font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r ${gradientClass}`}>
-                MediChain
+              
+              <span className="font-bold text-2xl">
+                <span className="text-primary">Medi</span>
+                <span className="text-teal-600">Chain</span>
               </span>
             </div>
             <p className="text-muted-foreground text-sm leading-relaxed mb-6 max-w-sm">
@@ -130,7 +129,7 @@ export function Footer({ activeTab = "patient" }: FooterProps) {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Copyright */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>© {new Date().getFullYear()} MediChain.</span>
+            <span>© {new Date().getFullYear()} <span className="text-muted-foreground">Medichain</span>.</span>
             <span className="hidden sm:inline">All rights reserved.</span>
             <span className="hidden sm:inline-flex items-center gap-1">
               Made with <Heart className={`w-3 h-3 ${accentColor} fill-current`} /> for healthcare
@@ -154,16 +153,17 @@ export function Footer({ activeTab = "patient" }: FooterProps) {
       </div>
 
       {/* Fluid Background Text */}
-      <div className="relative overflow-hidden py-6 bg-gradient-to-t from-secondary/30 to-transparent">
-        <div className="flex justify-center">
-          <span 
-            className={`text-[6rem] md:text-[10rem] lg:text-[14rem] font-black tracking-tighter select-none ${
-              isHospital ? "text-teal-500" : "text-primary"
-            }`}
-            style={{ opacity: 0.08 }}
-          >
-            MEDICHAIN
-          </span>
+      <div className="relative overflow-hidden py-4 md:py-6 bg-gradient-to-t from-secondary/30 to-transparent">
+        <div className="w-full overflow-hidden">
+          <div className="flex justify-center whitespace-nowrap">
+            <span 
+              className="text-[4rem] sm:text-[5rem] md:text-[8rem] lg:text-[12rem] xl:text-[14rem] font-black tracking-tighter select-none leading-none"
+              style={{ opacity: 0.08 }}
+            >
+              <span className="text-primary">MEDI</span>
+              <span className="text-teal-600">CHAIN</span>
+            </span>
+          </div>  
         </div>
       </div>
     </footer>

@@ -17,7 +17,6 @@ export default function Home() {
       <LandingSection activeTab={activeTab} setActiveTab={setActiveTab} />
       <MVPShowcase activeTab={activeTab} />
       <UserFlow activeTab={activeTab} />
-      <TechStack activeTab={activeTab} />
       <Footer activeTab={activeTab} />
     </div>
   )

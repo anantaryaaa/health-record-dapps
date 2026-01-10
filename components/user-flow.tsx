@@ -80,7 +80,7 @@ export function UserFlow({ activeTab }: UserFlowProps) {
           </motion.div>
 
           {/* Right Side - Flow Container */}
-          <div className="flex-1">
+          <div className="flex-1 w-full">
             <div className={`relative rounded-3xl border-2 border-dashed p-6 md:p-8 ${
               isPatient ? "border-primary/30" : "border-teal-500/30"
             }`}>
@@ -98,10 +98,10 @@ export function UserFlow({ activeTab }: UserFlowProps) {
                     transition={{ duration: 0.4, delay: index * 0.15 }}
                     className="relative"
                   >
-                    {/* Step Card */}
-                    <div className={`flex ${isEven ? "justify-start" : "justify-end"}`}>
-                      <div className={`flex items-center gap-4 p-4 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/50 max-w-[260px] ${
-                        !isEven ? "flex-row-reverse text-right" : ""
+                    {/* Step Card - Centered on mobile, alternating on md+ */}
+                    <div className={`flex justify-center ${isEven ? "md:justify-start" : "md:justify-end"}`}>
+                      <div className={`flex items-center gap-4 p-4 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/50 max-w-[280px] ${
+                        !isEven ? "md:flex-row-reverse md:text-right" : ""
                       }`}>
                         <div className={`relative flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${
                           isPatient ? "bg-primary/10" : "bg-teal-500/10"
@@ -120,47 +120,61 @@ export function UserFlow({ activeTab }: UserFlowProps) {
                       </div>
                     </div>
 
-                    {/* Connector Lines with marching animation */}
+                    {/* Connector Lines */}
                     {!isLast && (
-                      <div className="relative h-16 my-1">
-                        {/* Vertical line down */}
-                        <div 
-                          className="absolute w-0.5 march-down"
-                          style={{ 
-                            height: "20px",
-                            top: 0,
-                            left: isEven ? "130px" : "auto",
-                            right: isEven ? "auto" : "130px",
-                            background: `repeating-linear-gradient(to bottom, ${dashColor} 0px, ${dashColor} 4px, transparent 4px, transparent 8px)`,
-                            opacity: 0.6
-                          }}
-                        />
-                        
-                        {/* Horizontal line */}
-                        <div 
-                          className="absolute h-0.5 march-right"
-                          style={{ 
-                            top: "20px",
-                            left: "130px",
-                            right: "130px",
-                            background: `repeating-linear-gradient(to right, ${dashColor} 0px, ${dashColor} 4px, transparent 4px, transparent 8px)`,
-                            opacity: 0.6
-                          }}
-                        />
-                        
-                        {/* Vertical line down to next */}
-                        <div 
-                          className="absolute w-0.5 march-down"
-                          style={{ 
-                            height: "20px",
-                            top: "20px",
-                            left: isEven ? "auto" : "130px",
-                            right: isEven ? "130px" : "auto",
-                            background: `repeating-linear-gradient(to bottom, ${dashColor} 0px, ${dashColor} 4px, transparent 4px, transparent 8px)`,
-                            opacity: 0.6
-                          }}
-                        />
-                      </div>
+                      <>
+                        {/* Mobile: Simple vertical centered line */}
+                        <div className="flex justify-center py-2 md:hidden">
+                          <div 
+                            className="w-0.5 h-12 march-down"
+                            style={{ 
+                              background: `repeating-linear-gradient(to bottom, ${dashColor} 0px, ${dashColor} 4px, transparent 4px, transparent 8px)`,
+                              opacity: 0.6
+                            }}
+                          />
+                        </div>
+
+                        {/* Desktop: Zigzag connector lines */}
+                        <div className="hidden md:block relative h-16 my-1">
+                          {/* Vertical line down from current card */}
+                          <div 
+                            className="absolute w-0.5 march-down"
+                            style={{ 
+                              height: "20px",
+                              top: 0,
+                              left: isEven ? "140px" : "auto",
+                              right: isEven ? "auto" : "140px",
+                              background: `repeating-linear-gradient(to bottom, ${dashColor} 0px, ${dashColor} 4px, transparent 4px, transparent 8px)`,
+                              opacity: 0.6
+                            }}
+                          />
+                          
+                          {/* Horizontal line */}
+                          <div 
+                            className="absolute h-0.5 march-right"
+                            style={{ 
+                              top: "20px",
+                              left: "140px",
+                              right: "140px",
+                              background: `repeating-linear-gradient(to right, ${dashColor} 0px, ${dashColor} 4px, transparent 4px, transparent 8px)`,
+                              opacity: 0.6
+                            }}
+                          />
+                          
+                          {/* Vertical line down to next card */}
+                          <div 
+                            className="absolute w-0.5 march-down"
+                            style={{ 
+                              height: "20px",
+                              top: "20px",
+                              left: isEven ? "auto" : "140px",
+                              right: isEven ? "140px" : "auto",
+                              background: `repeating-linear-gradient(to bottom, ${dashColor} 0px, ${dashColor} 4px, transparent 4px, transparent 8px)`,
+                              opacity: 0.6
+                            }}
+                          />
+                        </div>
+                      </>
                     )}
                   </motion.div>
                 )

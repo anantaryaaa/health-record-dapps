@@ -40,9 +40,8 @@ import { User, CreditCard, Calendar, Loader2, CheckCircle2, AlertCircle, Externa
 const patientSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   nik: z.string()
-    .min(16, "NIK must be exactly 16 digits")
-    .max(16, "NIK must be exactly 16 digits")
-    .regex(/^\d+$/, "NIK must contain only numbers"),
+    .min(1, "Government ID is required")
+    .regex(/^[a-zA-Z0-9]+$/, "Government ID must contain only letters and numbers"),
   bloodType: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]),
   gender: z.enum(["Male", "Female"]),
   age: z.number().min(1, "Age must be valid").max(120, "Age must be valid"),
@@ -303,13 +302,13 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
             )}
           />
 
-          {/* NIK Field */}
+          {/* Government ID Field */}
           <form.Field
             name="nik"
             children={(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name} className="flex items-center gap-2 font-medium">
-                   ID Card Number (NIK)
+                   Government ID Number
                 </Label>
                 <div className="relative">
                   <CreditCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -319,7 +318,7 @@ export function PatientRegistrationForm({ walletAddress, onComplete }: PatientRe
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
-                    placeholder="16-digit NIK Number"
+                    placeholder="Enter your Government ID"
                     maxLength={16}
                     className={`pl-9 ${field.state.meta.errors.length ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   />

@@ -172,19 +172,18 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                {/* NIK */}
+                {/* Government ID */}
                 <div className="space-y-2">
                   <Label htmlFor="nik" className="flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-primary" />
-                    ID Card Number (NIK)
+                    Government ID Number
                   </Label>
                   <Input
                     id="nik"
-                    placeholder="Enter your 16 digit NIK"
+                    placeholder="Enter your Government ID"
                     value={formData.nik}
                     onChange={(e) => setFormData({ ...formData, nik: e.target.value })}
                     className="h-11 font-mono"
-                    maxLength={16}
                   />
                 </div>
 
